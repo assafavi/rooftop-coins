@@ -353,10 +353,6 @@
 
     if(flyFlash>0){x.fillStyle='rgba(0,0,0,.62)';roundRect(x,W/2-120,66,240,42,12);x.fill();x.fillStyle='#fff';x.font='bold 18px Arial';x.textAlign='center';x.fillText(flying?'FLY MODE ON!':'FLY MODE OFF',W/2,93);x.textAlign='left';}
 
-    if(mobileMode && H>W){
-      x.fillStyle='rgba(0,0,0,.55)';roundRect(x,W/2-145,48,290,40,10);x.fill();
-      x.fillStyle='#fff';x.font='bold 15px Arial';x.textAlign='center';x.fillText('Turn iPhone sideways for the best view',W/2,74);x.textAlign='left';
-    }
 
     if(finished){
       x.fillStyle='rgba(0,0,0,.65)';x.fillRect(0,0,W,H);
