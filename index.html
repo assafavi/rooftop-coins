@@ -3,12 +3,11 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
-<title>Rooftop Coin Jump - Mobile Build 7</title>
+<title>Rooftop Coin Jump - Mobile Build 8</title>
 <style>
-  :root{--gameW:100vw;--gameH:100vh}
-  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#10141a;font-family:Arial,Helvetica,sans-serif;overscroll-behavior:none}
+    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#10141a;font-family:Arial,Helvetica,sans-serif;overscroll-behavior:none}
   body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:none;position:relative}
-  #stage{position:absolute;left:0;top:0;width:var(--gameW);height:var(--gameH);overflow:hidden;background:#8dc9f3}
+  #stage{position:absolute;left:0;top:0;width:960px;height:540px;overflow:hidden;background:#8dc9f3}
   #game{display:block;width:100%;height:100%;background:#8dc9f3;touch-action:none}
   #help{position:absolute;right:12px;top:12px;background:rgba(10,12,18,.80);color:#fff;padding:10px 12px;border-radius:10px;font-size:13px;line-height:1.4;max-width:360px;backdrop-filter:blur(6px);user-select:none;z-index:5}
   #help b{color:#ffd166}
@@ -25,6 +24,9 @@
   body.mobile #help{display:none}
   @media (max-height:430px){
     .touchSide{bottom:6px}.touchBtn{width:48px;height:48px;font-size:20px}#jumpBtn{width:60px;height:60px;font-size:12px}
+  }
+  @media (orientation:portrait) and (max-width:900px){
+    .touchBtn{width:42px;height:42px;border-radius:12px;font-size:18px}#jumpBtn{width:52px;height:52px;font-size:11px}.touchSide{bottom:5px;gap:5px}.touchSide.left{left:5px}.touchSide.right{right:5px}#codeBtn{left:5px;top:5px;padding:4px 6px;font-size:8px}
   }
 </style>
 </head>
@@ -44,8 +46,9 @@
 (() => {
   const c=document.getElementById('game');
   const x=c.getContext('2d');
-  let W=1280,H=720,DPR=1;
-  let mobileMode=false, viewScale=1;
+  const W=960,H=540;
+  let DPR=1;
+  let mobileMode=false;
   const stage=document.getElementById('stage');
   function viewportSize(){
     const vv=window.visualViewport;
@@ -54,17 +57,23 @@
   function resize(){
     const v=viewportSize();
     DPR=Math.min(window.devicePixelRatio||1,2);
-    W=v.w;H=v.h;
     const isiPhone=/iPhone|iPod/i.test(navigator.userAgent);
-    mobileMode=isiPhone || matchMedia('(pointer:coarse)').matches || W<=900;
+    mobileMode=isiPhone || matchMedia('(pointer:coarse)').matches || v.w<=900;
     document.body.classList.toggle('mobile',mobileMode);
-    document.documentElement.style.setProperty('--gameW',W+'px');
-    document.documentElement.style.setProperty('--gameH',H+'px');
-    stage.style.left=v.left+'px';stage.style.top=v.top+'px';
-    viewScale=mobileMode ? Math.min(.72,Math.max(.46,(H-6)/720)) : 1;
+
+    // Fixed 16:9 game surface. We only scale the finished 960x540 frame to fit
+    // the browser's actually visible area. This is much more reliable on iPhone Firefox.
+    const targetAspect=W/H;
+    let sw=v.w, sh=sw/targetAspect;
+    if(sh>v.h){sh=v.h;sw=sh*targetAspect;}
+    sw=Math.max(1,Math.floor(sw));sh=Math.max(1,Math.floor(sh));
+    stage.style.width=sw+'px';stage.style.height=sh+'px';
+    stage.style.left=Math.round(v.left+(v.w-sw)/2)+'px';
+    stage.style.top=Math.round(v.top+(v.h-sh)/2)+'px';
+
     c.width=Math.max(1,Math.round(W*DPR));
     c.height=Math.max(1,Math.round(H*DPR));
-    c.style.width=W+'px';c.style.height=H+'px';
+    c.style.width='100%';c.style.height='100%';
     x.setTransform(DPR,0,0,DPR,0,0);
   }
   addEventListener('resize',resize);
@@ -180,9 +189,7 @@
   }
 
   function reset(now=performance.now()){
-    const rect=c.getBoundingClientRect();
-    if(rect.width>0&&rect.height>0){W=Math.round(rect.width);H=Math.round(rect.height);}
-    player.x=80;player.y=Math.min(390,H/viewScale-150);player.vx=0;player.vy=0;player.dir=1;player.onGround=false;player.jumps=0;
+    player.x=80;player.y=390;player.vx=0;player.vy=0;player.dir=1;player.onGround=false;player.jumps=0;
     coins=coinSeed.map(q=>({...q,taken:false}));
     score=0;collected=0;lives=3;startTime=now;finished=false;finishReason='';finalElapsed=0;scoreSaved=false;flying=false;flyFlash=0;cam.x=0;secret='';
     clearInput();clearTouch();
@@ -194,8 +201,7 @@
 
   function drawWorld(){
     x.save();
-    x.scale(viewScale,viewScale);
-    const VW=W/viewScale, VH=H/viewScale;
+    const VW=W, VH=H;
     x.fillStyle=gradient(0,VH,'#79c3ef','#edf8ff');x.fillRect(0,0,VW,VH);
     const skylineBase=Math.min(VH-80,620);
     const off=-cam.x*.18;
@@ -235,7 +241,7 @@
 
   function drawPlayer(){
     const sx=player.x-cam.x,sy=player.y;
-    x.save();x.scale(viewScale,viewScale);x.translate(sx+player.w/2,sy+player.h/2);x.scale(player.dir,1);
+    x.save();x.translate(sx+player.w/2,sy+player.h/2);x.scale(player.dir,1);
     x.fillStyle='rgba(0,0,0,.20)';x.beginPath();x.ellipse(0,player.h/2+5,23,6,0,0,Math.PI*2);x.fill();
     if(flying){
       x.fillStyle='rgba(255,255,255,.72)';
@@ -296,7 +302,7 @@
 
     if(player.x>=FINISH_X){finishRound('finish');return;}
 
-    const VH=H/viewScale, VW=W/viewScale;
+    const VH=H, VW=W;
     if(player.y>VH+120){
       lives--;
       if(lives<=0){finishRound('lives');return;}
@@ -339,7 +345,6 @@
     drawWorld();drawPlayer();
 
     if(mobileMode){
-      const padL=Math.max(8,parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sat')||0));
       x.fillStyle='rgba(8,10,14,.72)';roundRect(x,W/2-165,6,330,34,12);x.fill();
       x.textAlign='center';x.font='bold 15px Arial';x.fillStyle=remain<=10?'#ff8a80':'#fff';
       x.fillText(remain.toFixed(1)+'s   •   Coins '+collected+'/'+coins.length+'   •   Lives '+lives+'/3',W/2,28);x.textAlign='left';
@@ -353,9 +358,9 @@
 
     if(flyFlash>0){x.fillStyle='rgba(0,0,0,.62)';roundRect(x,W/2-120,66,240,42,12);x.fill();x.fillStyle='#fff';x.font='bold 18px Arial';x.textAlign='center';x.fillText(flying?'FLY MODE ON!':'FLY MODE OFF',W/2,93);x.textAlign='left';}
 
-    if(mobileMode && H>W){
-      x.fillStyle='rgba(0,0,0,.55)';roundRect(x,W/2-145,48,290,40,10);x.fill();
-      x.fillStyle='#fff';x.font='bold 15px Arial';x.textAlign='center';x.fillText('Turn iPhone sideways for the best view',W/2,74);x.textAlign='left';
+    if(mobileMode && window.innerHeight>window.innerWidth){
+      x.fillStyle='rgba(0,0,0,.55)';roundRect(x,W/2-170,46,340,36,10);x.fill();
+      x.fillStyle='#fff';x.font='bold 14px Arial';x.textAlign='center';x.fillText('Rotate sideways for a larger game view',W/2,69);x.textAlign='left';
     }
 
     if(finished){
