@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+<title>Rooftop Coin Jump - Mobile Build 7</title>
+<style>
+  :root{--gameW:100vw;--gameH:100vh}
+  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#10141a;font-family:Arial,Helvetica,sans-serif;overscroll-behavior:none}
+  body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:none;position:relative}
+  #stage{position:absolute;left:0;top:0;width:var(--gameW);height:var(--gameH);overflow:hidden;background:#8dc9f3}
+  #game{display:block;width:100%;height:100%;background:#8dc9f3;touch-action:none}
+  #help{position:absolute;right:12px;top:12px;background:rgba(10,12,18,.80);color:#fff;padding:10px 12px;border-radius:10px;font-size:13px;line-height:1.4;max-width:360px;backdrop-filter:blur(6px);user-select:none;z-index:5}
+  #help b{color:#ffd166}
+  #touchControls{display:none;position:absolute;inset:0;z-index:10;pointer-events:none}
+  .touchSide{display:flex;gap:8px;pointer-events:auto;position:absolute;bottom:10px}
+  .touchSide.left{left:10px}
+  .touchSide.right{right:10px}
+  .touchBtn{width:54px;height:54px;border-radius:15px;border:2px solid rgba(255,255,255,.80);background:rgba(10,12,18,.48);color:#fff;font:bold 22px Arial;touch-action:none;-webkit-tap-highlight-color:transparent;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+  .touchBtn:active,.touchBtn.active{background:rgba(255,209,102,.92);color:#111}
+  #jumpBtn{width:68px;height:68px;border-radius:50%;font-size:14px}
+  #downBtn{display:none}
+  #codeBtn{position:absolute;left:8px;top:8px;z-index:12;display:none;border:1px solid rgba(255,255,255,.4);background:rgba(10,12,18,.45);color:#fff;border-radius:8px;padding:5px 7px;font:bold 9px Arial;letter-spacing:.08em;touch-action:manipulation}
+  body.mobile #touchControls,body.mobile #codeBtn{display:block}
+  body.mobile #help{display:none}
+  @media (max-height:430px){
+    .touchSide{bottom:6px}.touchBtn{width:48px;height:48px;font-size:20px}#jumpBtn{width:60px;height:60px;font-size:12px}
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+<canvas id="game"></canvas>
+<div id="help"><b>MOVE</b>: A/D or ←/→ · <b>JUMP</b>: W / ↑ / Space · double-jump enabled<br><b>R</b>: restart 60-second round · <b>H</b>: end game early<br><b>LIVES</b>: 3 · falling off the bottom costs one life<br><b>GOAL</b>: reach the final rooftop or collect every coin before time runs out<br><span style="opacity:.65">On iPhone, use the touch controls. There may be a secret code...</span></div>
+<button id="codeBtn" type="button" aria-label="Enter secret code">CODE</button>
+<div id="touchControls" aria-label="Touch game controls">
+  <div class="touchRow">
+    <div class="touchSide left"><button id="leftBtn" class="touchBtn" type="button" aria-label="Move left">◀</button><button id="rightBtn" class="touchBtn" type="button" aria-label="Move right">▶</button></div>
+    <div class="touchSide right"><button id="downBtn" class="touchBtn" type="button" aria-label="Fly down">▼</button><button id="jumpBtn" class="touchBtn" type="button" aria-label="Jump or fly up">JUMP</button></div>
+  </div>
+</div>
+</div>
+<script>
+(() => {
+  const c=document.getElementById('game');
+  const x=c.getContext('2d');
+  let W=1280,H=720,DPR=1;
+  let mobileMode=false, viewScale=1;
+  const stage=document.getElementById('stage');
+  function viewportSize(){
+    const vv=window.visualViewport;
+    return {w:Math.max(1,Math.round(vv?vv.width:window.innerWidth)),h:Math.max(1,Math.round(vv?vv.height:window.innerHeight)),top:Math.round(vv?vv.offsetTop:0),left:Math.round(vv?vv.offsetLeft:0)};
+  }
+  function resize(){
+    const v=viewportSize();
+    DPR=Math.min(window.devicePixelRatio||1,2);
+    W=v.w;H=v.h;
+    const isiPhone=/iPhone|iPod/i.test(navigator.userAgent);
+    mobileMode=isiPhone || matchMedia('(pointer:coarse)').matches || W<=900;
+    document.body.classList.toggle('mobile',mobileMode);
+    document.documentElement.style.setProperty('--gameW',W+'px');
+    document.documentElement.style.setProperty('--gameH',H+'px');
+    stage.style.left=v.left+'px';stage.style.top=v.top+'px';
+    viewScale=mobileMode ? Math.min(.72,Math.max(.46,(H-6)/720)) : 1;
+    c.width=Math.max(1,Math.round(W*DPR));
+    c.height=Math.max(1,Math.round(H*DPR));
+    c.style.width=W+'px';c.style.height=H+'px';
+    x.setTransform(DPR,0,0,DPR,0,0);
+  }
+  addEventListener('resize',resize);
+  addEventListener('orientationchange',()=>setTimeout(resize,100));
+  if(window.visualViewport){visualViewport.addEventListener('resize',resize);visualViewport.addEventListener('scroll',resize);}
+  resize();
+
+  const keys=Object.create(null), pressed=Object.create(null);
+  let secret='';
+  addEventListener('keydown',e=>{
+    const k=e.key.toLowerCase();
+    keys[k]=true;
+    if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();
+    if(k==='r')reset();
+    if(k==='h'&&!finished)finishRound('early');
+    if(/^[0-9]$/.test(e.key)){
+      secret=(secret+e.key).slice(-2);
+      if(secret==='67'){flying=!flying;player.vy=0;flyFlash=1.5;secret='';}
+    }
+  });
+  addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+  function clearInput(){
+    for(const k in keys) delete keys[k];
+    for(const k in pressed) delete pressed[k];
+  }
+  addEventListener('blur',clearInput);
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)clearInput();});
+  function edge(k){const v=!!keys[k],o=pressed[k];pressed[k]=v;return v&&!o;}
+
+  const touch={left:false,right:false,up:false,down:false,jumpQueued:false};
+  function clearTouch(){touch.left=touch.right=touch.up=touch.down=false;touch.jumpQueued=false;document.querySelectorAll('.touchBtn').forEach(b=>b.classList.remove('active'));}
+  function bindHold(id,prop){
+    const b=document.getElementById(id);
+    const on=e=>{e.preventDefault();touch[prop]=true;b.classList.add('active');};
+    const off=e=>{e.preventDefault();touch[prop]=false;b.classList.remove('active');};
+    b.addEventListener('pointerdown',on,{passive:false});b.addEventListener('pointerup',off,{passive:false});b.addEventListener('pointercancel',off,{passive:false});b.addEventListener('pointerleave',off,{passive:false});
+  }
+  bindHold('leftBtn','left');bindHold('rightBtn','right');bindHold('downBtn','down');
+  const jumpBtn=document.getElementById('jumpBtn');
+  jumpBtn.addEventListener('pointerdown',e=>{e.preventDefault();jumpBtn.classList.add('active');if(flying)touch.up=true;else touch.jumpQueued=true;},{passive:false});
+  const releaseJump=e=>{e.preventDefault();jumpBtn.classList.remove('active');touch.up=false;};
+  jumpBtn.addEventListener('pointerup',releaseJump,{passive:false});jumpBtn.addEventListener('pointercancel',releaseJump,{passive:false});jumpBtn.addEventListener('pointerleave',releaseJump,{passive:false});
+  document.getElementById('codeBtn').addEventListener('click',()=>{
+    let v='';try{v=window.prompt('Enter secret code:','')||'';}catch(err){}
+    if(v.trim()==='67'){flying=!flying;player.vy=0;flyFlash=1.5;clearTouch();}
+  });
+  c.addEventListener('contextmenu',e=>e.preventDefault());
+  c.addEventListener('touchmove',e=>e.preventDefault(),{passive:false});
+  addEventListener('blur',clearTouch);
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)clearTouch();});
+
+  const world={w:4300};
+  const cam={x:0};
+  const buildings=[
+    {x:-80,w:360,y:520,h:220,c:'#b96d55'},{x:360,w:260,y:440,h:300,c:'#d0b48c'},
+    {x:720,w:210,y:500,h:240,c:'#9ba9b7'},{x:1040,w:340,y:390,h:350,c:'#d08c64'},
+    {x:1490,w:190,y:470,h:270,c:'#b2a9bf'},{x:1780,w:300,y:350,h:390,c:'#aab8c4'},
+    {x:2190,w:220,y:455,h:285,c:'#c98068'},{x:2520,w:380,y:330,h:410,c:'#d0b16e'},
+    {x:3030,w:190,y:485,h:255,c:'#9aaabd'},{x:3330,w:300,y:375,h:365,c:'#bd7862'},
+    {x:3740,w:420,y:300,h:440,c:'#9fa7b5'}
+  ];
+  const finalBuilding=buildings[buildings.length-1];
+  const FINISH_X=finalBuilding.x+finalBuilding.w-55;
+
+  const coinSeed=[];
+  buildings.forEach((b,i)=>{
+    if(i===0)return;
+    coinSeed.push({x:b.x+b.w*.23,y:b.y-34});
+    coinSeed.push({x:b.x+b.w*.50,y:b.y-62});
+    coinSeed.push({x:b.x+b.w*.77,y:b.y-34});
+    if(i%3===0) coinSeed.push({x:b.x-48,y:b.y-115});
+  });
+
+  const player={x:80,y:400,w:34,h:54,vx:0,vy:0,dir:1,onGround:false,jumps:0};
+  let coins=[],score=0,collected=0,lives=3,startTime=0,last=0,finished=false,roundReady=false,flying=false,flyFlash=0;
+  let finishReason='',finalElapsed=0,scoreSaved=false;
+
+  const SCORE_KEY='rooftopCoinJumpHighScoresV1';
+  let sessionScores=[];
+  function loadScores(){
+    try{
+      const raw=localStorage.getItem(SCORE_KEY);
+      const arr=raw?JSON.parse(raw):[];
+      return Array.isArray(arr)?arr.slice(0,5):[];
+    }catch(err){return sessionScores.slice(0,5);}
+  }
+  function saveScores(list){
+    sessionScores=list.slice(0,5);
+    try{localStorage.setItem(SCORE_KEY,JSON.stringify(sessionScores));}catch(err){}
+  }
+  function addHighScore(){
+    if(scoreSaved||finishReason==='early')return;
+    scoreSaved=true;
+    const list=loadScores();
+    const qualifies=list.length<5||score>list[list.length-1].score||(score===list[list.length-1].score&&finalElapsed<list[list.length-1].time);
+    if(!qualifies)return;
+    let name='PLAYER';
+    try{
+      const entered=window.prompt('New high score! Enter a name (up to 10 characters):','PLAYER');
+      if(entered!==null&&entered.trim())name=entered.trim().slice(0,10).toUpperCase();
+    }catch(err){}
+    list.push({name,score,coins:collected,time:+finalElapsed.toFixed(1),reason:finishReason});
+    list.sort((a,b)=>b.score-a.score||a.time-b.time||b.coins-a.coins);
+    saveScores(list.slice(0,5));
+  }
+
+  function finishRound(reason){
+    if(finished)return;
+    finalElapsed=Math.min(60,Math.max(0,(performance.now()-startTime)/1000));
+    finishReason=reason;
+    finished=true;
+    addHighScore();
+  }
+
+  function reset(now=performance.now()){
+    const rect=c.getBoundingClientRect();
+    if(rect.width>0&&rect.height>0){W=Math.round(rect.width);H=Math.round(rect.height);}
+    player.x=80;player.y=Math.min(390,H/viewScale-150);player.vx=0;player.vy=0;player.dir=1;player.onGround=false;player.jumps=0;
+    coins=coinSeed.map(q=>({...q,taken:false}));
+    score=0;collected=0;lives=3;startTime=now;finished=false;finishReason='';finalElapsed=0;scoreSaved=false;flying=false;flyFlash=0;cam.x=0;secret='';
+    clearInput();clearTouch();
+    roundReady=true;
+  }
+
+  function roundRect(ctx,a,b,w,h,r){ctx.beginPath();ctx.roundRect(a,b,w,h,r);}
+  function gradient(y1,y2,c1,c2){const g=x.createLinearGradient(0,y1,0,y2);g.addColorStop(0,c1);g.addColorStop(1,c2);return g;}
+
+  function drawWorld(){
+    x.save();
+    x.scale(viewScale,viewScale);
+    const VW=W/viewScale, VH=H/viewScale;
+    x.fillStyle=gradient(0,VH,'#79c3ef','#edf8ff');x.fillRect(0,0,VW,VH);
+    const skylineBase=Math.min(VH-80,620);
+    const off=-cam.x*.18;
+    for(let i=0;i<22;i++){
+      const bx=off+i*210-120,bh=90+(i%5)*32;
+      x.fillStyle=i%2?'#a7b5c0':'#93a5b2';x.fillRect(bx,skylineBase-bh,160,bh);
+      x.fillStyle='rgba(255,238,170,.35)';
+      for(let yy=skylineBase-bh+18;yy<skylineBase-12;yy+=26)for(let xx=bx+15;xx<bx+145;xx+=34)x.fillRect(xx,yy,16,10);
+    }
+    x.save();x.translate(-cam.x,0);
+    for(const b of buildings){
+      const base=Math.max(VH+80,760);
+      x.fillStyle='#69737d';x.fillRect(b.x+16,b.y-18,b.w,base-b.y+18);
+      x.fillStyle=b.c;x.fillRect(b.x,b.y,b.w,base-b.y);
+      x.fillStyle='#555d65';x.fillRect(b.x-7,b.y-9,b.w+14,11);
+      for(let wy=b.y+28;wy<Math.min(base-24,b.y+250);wy+=52){
+        for(let wx=b.x+22;wx<b.x+b.w-25;wx+=48){
+          x.fillStyle=((wx+wy)%4===0)?'#ffe08a':'#6f8b9c';
+          x.fillRect(wx,wy,24,28);
+          x.fillStyle='rgba(245,250,255,.45)';x.fillRect(wx+4,wy+4,8,20);
+        }
+      }
+    }
+    // Finish flag on the last rooftop.
+    x.strokeStyle='#30343a';x.lineWidth=5;x.beginPath();x.moveTo(FINISH_X,finalBuilding.y);x.lineTo(FINISH_X,finalBuilding.y-90);x.stroke();
+    x.fillStyle='#f5f5f5';x.fillRect(FINISH_X,finalBuilding.y-88,52,31);
+    x.fillStyle='#242424';x.fillRect(FINISH_X,finalBuilding.y-88,26,15);x.fillRect(FINISH_X+26,finalBuilding.y-73,26,16);
+
+    for(const q of coins){
+      if(q.taken)continue;
+      x.fillStyle='#f4c542';x.beginPath();x.arc(q.x,q.y,12,0,Math.PI*2);x.fill();
+      x.strokeStyle='#a96f12';x.lineWidth=3;x.stroke();x.fillStyle='#fff3a5';x.fillRect(q.x-2,q.y-7,4,14);
+    }
+    x.restore();
+    x.restore();
+  }
+
+  function drawPlayer(){
+    const sx=player.x-cam.x,sy=player.y;
+    x.save();x.scale(viewScale,viewScale);x.translate(sx+player.w/2,sy+player.h/2);x.scale(player.dir,1);
+    x.fillStyle='rgba(0,0,0,.20)';x.beginPath();x.ellipse(0,player.h/2+5,23,6,0,0,Math.PI*2);x.fill();
+    if(flying){
+      x.fillStyle='rgba(255,255,255,.72)';
+      x.beginPath();x.ellipse(-25,2,22,8,-.45,0,Math.PI*2);x.ellipse(25,2,22,8,.45,0,Math.PI*2);x.fill();
+    }
+    x.fillStyle='#26384f';roundRect(x,-15,-8,30,31,7);x.fill();
+    x.fillStyle='#f0b58e';x.beginPath();x.arc(0,-20,12,0,Math.PI*2);x.fill();
+    x.fillStyle='#1a2432';roundRect(x,-14,20,10,27,5);x.fill();roundRect(x,4,20,10,27,5);x.fill();
+    x.fillStyle='#fff';x.beginPath();x.arc(-4,-22,2.3,0,Math.PI*2);x.arc(4,-22,2.3,0,Math.PI*2);x.fill();
+    x.restore();
+  }
+
+  function update(dt){
+    if(finished)return;
+    const left=!!keys['a']||!!keys['arrowleft']||touch.left;
+    const right=!!keys['d']||!!keys['arrowright']||touch.right;
+    const up=!!keys['w']||!!keys['arrowup']||!!keys[' ']||touch.up;
+    const down=!!keys['s']||!!keys['arrowdown']||touch.down;
+    const speed=flying?340:300;
+    player.vx+=(right-left)*1200*dt;
+    player.vx*=Math.pow(.003,dt);
+    player.vx=Math.max(-speed,Math.min(speed,player.vx));
+    if(right)player.dir=1;if(left)player.dir=-1;
+
+    if(flying){
+      const flySpeed=310;
+      player.vy=(down-up)*flySpeed;
+    }else{
+      if((edge('w')||edge('arrowup')||edge(' ')||touch.jumpQueued)&&player.jumps<2){player.vy=-540;player.jumps++;}
+      touch.jumpQueued=false;
+      player.vy+=1450*dt;
+    }
+
+    const oldY=player.y;
+    player.x+=player.vx*dt;
+    player.y+=player.vy*dt;
+    player.x=Math.max(5,Math.min(world.w-player.w-5,player.x));
+    player.onGround=false;
+
+    if(!flying){
+      for(const b of buildings){
+        const horizontal=player.x+player.w>b.x&&player.x<b.x+b.w;
+        const oldBottom=oldY+player.h,newBottom=player.y+player.h;
+        if(horizontal&&player.vy>=0&&oldBottom<=b.y+10&&newBottom>=b.y){
+          player.y=b.y-player.h;player.vy=0;player.onGround=true;player.jumps=0;
+        }
+      }
+    }
+
+    for(const q of coins){
+      if(q.taken)continue;
+      const dx=(player.x+player.w/2)-q.x,dy=(player.y+player.h/2)-q.y;
+      if(dx*dx+dy*dy<31*31){
+        q.taken=true;collected++;score+=100;
+        if(collected===coins.length){finishRound('coins');return;}
+      }
+    }
+
+    if(player.x>=FINISH_X){finishRound('finish');return;}
+
+    const VH=H/viewScale, VW=W/viewScale;
+    if(player.y>VH+120){
+      lives--;
+      if(lives<=0){finishRound('lives');return;}
+      player.x=Math.max(80,cam.x+100);player.y=80;player.vx=0;player.vy=0;player.jumps=0;player.onGround=false;
+    }
+    player.y=Math.max(-40,player.y);
+    cam.x=Math.max(0,Math.min(world.w-VW,player.x-VW*.34));
+  }
+
+  function drawHighScores(){
+    const list=loadScores();
+    const boxW=mobileMode?310:360, rowH=mobileMode?22:27, boxH=(mobileMode?58:74)+Math.max(1,list.length)*rowH;
+    const bx=W/2-boxW/2,by=H/2+(mobileMode?92:118);
+    x.fillStyle='rgba(8,10,14,.86)';roundRect(x,bx,by,boxW,boxH,14);x.fill();
+    x.fillStyle='#ffd166';x.textAlign='center';x.font=mobileMode?'bold 16px Arial':'bold 20px Arial';x.fillText('HIGH SCORES',W/2,by+(mobileMode?22:29));
+    x.font=mobileMode?'11px Arial':'13px Arial';x.fillStyle='#cfd8e3';
+    if(!list.length){x.fillText('No saved scores yet',W/2,by+59);}
+    else{
+      x.textAlign='left';
+      list.forEach((s,i)=>{
+        const yy=by+(mobileMode?42:58)+i*rowH;
+        x.fillStyle=i===0?'#ffd166':'#fff';
+        x.fillText((i+1)+'. '+s.name,bx+22,yy);
+        x.textAlign='right';x.fillText(s.score+' pts  ·  '+s.coins+' coins  ·  '+Number(s.time).toFixed(1)+'s',bx+boxW-22,yy);x.textAlign='left';
+      });
+    }
+    x.textAlign='left';
+  }
+
+  function frame(now){
+    if(!roundReady){reset(now);last=now;}
+    const dt=last?Math.min(.033,Math.max(0,(now-last)/1000)):0;last=now;
+    const elapsed=finished?finalElapsed:(now-startTime)/1000;
+    const remain=Math.max(0,60-elapsed);
+    if(!finished&&remain<=0)finishRound('time');
+    if(flyFlash>0)flyFlash=Math.max(0,flyFlash-dt);
+    document.getElementById('downBtn').style.display=flying?'block':'none';
+    document.getElementById('jumpBtn').textContent=flying?'FLY UP':'JUMP';
+    update(dt);
+    drawWorld();drawPlayer();
+
+    if(mobileMode){
+      const padL=Math.max(8,parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sat')||0));
+      x.fillStyle='rgba(8,10,14,.72)';roundRect(x,W/2-165,6,330,34,12);x.fill();
+      x.textAlign='center';x.font='bold 15px Arial';x.fillStyle=remain<=10?'#ff8a80':'#fff';
+      x.fillText(remain.toFixed(1)+'s   •   Coins '+collected+'/'+coins.length+'   •   Lives '+lives+'/3',W/2,28);x.textAlign='left';
+    }else{
+      x.fillStyle='rgba(8,10,14,.80)';roundRect(x,14,14,300,128,14);x.fill();
+      x.fillStyle=remain<=10?'#ff8a80':'#fff';x.font='bold 30px Arial';x.fillText(remain.toFixed(1)+' s',28,49);
+      x.fillStyle='#fff';x.font='15px Arial';x.fillText('Coins: '+collected+' / '+coins.length,28,76);x.fillText('Score: '+score,28,99);x.fillText('Lives: '+lives+' / 3',28,122);
+      x.fillStyle='rgba(8,10,14,.55)';roundRect(x,W/2-185,18,370,34,14);x.fill();
+      x.fillStyle='#fff';x.font='bold 15px Arial';x.textAlign='center';x.fillText('ROOFTOP COINS',W/2,40);x.textAlign='left';
+    }
+
+    if(flyFlash>0){x.fillStyle='rgba(0,0,0,.62)';roundRect(x,W/2-120,66,240,42,12);x.fill();x.fillStyle='#fff';x.font='bold 18px Arial';x.textAlign='center';x.fillText(flying?'FLY MODE ON!':'FLY MODE OFF',W/2,93);x.textAlign='left';}
+
+    if(mobileMode && H>W){
+      x.fillStyle='rgba(0,0,0,.55)';roundRect(x,W/2-145,48,290,40,10);x.fill();
+      x.fillStyle='#fff';x.font='bold 15px Arial';x.textAlign='center';x.fillText('Turn iPhone sideways for the best view',W/2,74);x.textAlign='left';
+    }
+
+    if(finished){
+      x.fillStyle='rgba(0,0,0,.65)';x.fillRect(0,0,W,H);
+      x.fillStyle='#fff';x.textAlign='center';x.font=mobileMode?'bold 30px Arial':'bold 46px Arial';
+      const title=finishReason==='finish'?'FINISH LINE!':finishReason==='coins'?'ALL COINS COLLECTED!':finishReason==='early'?'GAME ENDED':finishReason==='lives'?'OUT OF LIVES!':'TIME!';
+      x.fillText(title,W/2,H/2-78);
+      x.font=mobileMode?'bold 17px Arial':'bold 23px Arial';x.fillText('Time: '+finalElapsed.toFixed(1)+' seconds',W/2,H/2-34);
+      x.fillText('Coins collected: '+collected+' / '+coins.length,W/2,H/2+2);
+      x.fillText('Score: '+score,W/2,H/2+38);
+      x.font=mobileMode?'14px Arial':'17px Arial';x.fillText(mobileMode?'Tap the screen to play again':'Press R or tap the screen to play again',W/2,H/2+76);x.textAlign='left';
+      if(!mobileMode || H>=430) drawHighScores();
+    }
+    requestAnimationFrame(frame);
+  }
+  c.addEventListener('pointerup',()=>{if(finished)reset();});
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
