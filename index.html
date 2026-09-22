@@ -23,7 +23,7 @@
   #codeBtn{position:absolute;left:8px;top:8px;z-index:12;display:none;border:1px solid rgba(255,255,255,.4);background:rgba(10,12,18,.45);color:#fff;border-radius:8px;padding:5px 7px;font:bold 9px Arial;letter-spacing:.08em;touch-action:manipulation}
   #mobileActions{display:none;position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:13;gap:8px;pointer-events:auto}
   .actionBtn{width:38px;height:34px;min-width:38px;padding:0;border-radius:10px;border:2px solid rgba(255,255,255,.78);background:rgba(10,12,18,.58);color:#fff;font:bold 16px Arial;letter-spacing:0;touch-action:manipulation;-webkit-tap-highlight-color:transparent;box-shadow:0 2px 8px rgba(0,0,0,.25)}
-  .actionBtn:active{background:rgba(255,209,102,.92);color:#111}
+  .actionBtn:active,.actionBtn.active{background:rgba(255,209,102,.92);color:#111}
   body.mobile #touchControls,body.mobile #codeBtn,body.mobile #mobileActions{display:flex}
   body.mobile #help{display:none}
   #splash{position:absolute;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;background:#09111b;overflow:hidden;}
@@ -40,7 +40,7 @@
 <body>
 <div id="stage">
 <canvas id="game"></canvas>
-<div id="help"><b>MOVE</b>: A/D or ←/→ · <b>JUMP</b>: W / ↑ / Space · double-jump enabled<br><b>R</b>: restart 60-second round · <b>H</b>: end game early<br><b>LIVES</b>: 3 · falling off the bottom costs one life<br><b>GOAL</b>: reach the final rooftop or collect every coin before time runs out<br><span style="opacity:.65">On iPhone: R = restart · E = end early · use the touch controls. There may be a secret code...</span></div>
+<div id="help"><b>MOVE</b>: A/D or ←/→ · <b>JUMP</b>: W / ↑ / Space · double-jump enabled<br><b>R</b>: restart 60-second round · <b>H</b>: end game early<br><b>LIVES</b>: 3 · falling off the bottom costs one life<br><b>GOAL</b>: reach the final rooftop or collect every coin before time runs out<br><span style="opacity:.65">On iPhone: hold R = restart · hold E = end early · use the touch controls. There may be a secret code...</span></div>
 <button id="codeBtn" type="button" aria-label="Enter secret code">CODE</button>
 <div id="mobileActions" aria-label="Game actions"><button id="restartBtn" class="actionBtn" type="button" aria-label="Restart">R</button><button id="endBtn" class="actionBtn" type="button" aria-label="End game early">E</button></div>
 <div id="touchControls" aria-label="Touch game controls">
@@ -130,14 +130,33 @@
     let v='';try{v=window.prompt('Enter secret code:','')||'';}catch(err){}
     if(v.trim()==='67'){flying=!flying;player.vy=0;flyFlash=1.5;clearTouch();}
   });
-  document.getElementById('restartBtn').addEventListener('pointerdown',e=>{
-    e.preventDefault();
-    if(gameStarted) reset();
-  },{passive:false});
-  document.getElementById('endBtn').addEventListener('pointerdown',e=>{
-    e.preventDefault();
-    if(gameStarted&&!finished) finishRound('early');
-  },{passive:false});
+  function bindHoldAction(id, action){
+    const b=document.getElementById(id);
+    let timer=null;
+    let fired=false;
+    const clear=()=>{
+      if(timer!==null){clearTimeout(timer);timer=null;}
+      b.classList.remove('active');
+      fired=false;
+    };
+    b.addEventListener('pointerdown',e=>{
+      e.preventDefault();
+      clear();
+      b.classList.add('active');
+      timer=setTimeout(()=>{
+        timer=null;
+        fired=true;
+        b.classList.remove('active');
+        action();
+      },MOBILE_ACTION_HOLD_SECONDS*1000);
+    },{passive:false});
+    ['pointerup','pointercancel','pointerleave'].forEach(type=>b.addEventListener(type,e=>{
+      e.preventDefault();
+      if(!fired) clear();
+    },{passive:false}));
+  }
+  bindHoldAction('restartBtn',()=>{if(gameStarted) reset();});
+  bindHoldAction('endBtn',()=>{if(gameStarted&&!finished) finishRound('early');});
   c.addEventListener('contextmenu',e=>e.preventDefault());
   c.addEventListener('touchmove',e=>e.preventDefault(),{passive:false});
   addEventListener('blur',clearTouch);
@@ -182,6 +201,9 @@
 
   // Points awarded for each coin.
   const COIN_POINTS = 100;
+
+  // How long the mobile R and E buttons must be held before they activate, in seconds.
+  const MOBILE_ACTION_HOLD_SECONDS = 2.5;
   // ============================================================
   // END GAME SETTINGS - you normally do not need to edit below.
   // ============================================================
