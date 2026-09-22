@@ -157,6 +157,31 @@
   let coins=[],score=0,collected=0,lives=3,startTime=0,last=0,finished=false,roundReady=false,flying=false,flyFlash=0;
   let finishReason='',finalElapsed=0,scoreSaved=false;
 
+  // Persistent character progression: one visual upgrade every 10 rounds played.
+  const PLAY_COUNT_KEY='rooftopCoinJumpPlayCountV1';
+  let playCount=0,upgradeFlash=0;
+  try{playCount=Math.max(0,parseInt(localStorage.getItem(PLAY_COUNT_KEY)||'0',10)||0);}catch(err){}
+  function upgradeLevel(){return Math.min(4,Math.floor(playCount/10));}
+  function upgradeName(){return ['ROOKIE','STREET RUNNER','ROOFTOP PRO','SKY RACER','ROOFTOP LEGEND'][upgradeLevel()];}
+  function registerPlay(){
+    const before=upgradeLevel();
+    playCount++;
+    try{localStorage.setItem(PLAY_COUNT_KEY,String(playCount));}catch(err){}
+    if(upgradeLevel()>before) upgradeFlash=2.4;
+  }
+
+  // The city atmosphere changes every 20 plays, using the same persistent play counter.
+  function backgroundLevel(){return Math.floor(playCount/20)%5;}
+  function backgroundPalette(){
+    return [
+      {top:'#5aa9ea',mid:'#a9d9f4',bottom:'#f7d3aa',sun:'#fff3c0',glow:'rgba(255,214,120,.55)',far1:'#8197aa',far2:'#71899e'},
+      {top:'#55b8ee',mid:'#bce8f6',bottom:'#f6e2bd',sun:'#fff8d5',glow:'rgba(255,226,130,.50)',far1:'#8ca5b5',far2:'#7893a6'},
+      {top:'#5265c8',mid:'#e58b88',bottom:'#f7bd77',sun:'#ffd88c',glow:'rgba(255,153,90,.58)',far1:'#6f718f',far2:'#5f617d'},
+      {top:'#102452',mid:'#273f72',bottom:'#684d78',sun:'#f2ecce',glow:'rgba(210,220,255,.18)',far1:'#35425d',far2:'#29354e'},
+      {top:'#6d67c7',mid:'#b68ac8',bottom:'#f3c5ad',sun:'#ffe8c4',glow:'rgba(255,196,170,.40)',far1:'#797a9b',far2:'#696b8c'}
+    ][backgroundLevel()];
+  }
+
   const SCORE_KEY='rooftopCoinJumpHighScoresV1';
   let sessionScores=[];
   function loadScores(){
@@ -195,6 +220,7 @@
   }
 
   function reset(now=performance.now()){
+    registerPlay();
     const rect=c.getBoundingClientRect();
     if(rect.width>0&&rect.height>0){W=Math.round(rect.width);H=Math.round(rect.height);}
     player.x=80;player.y=Math.min(390,H/viewScale-150);player.vx=0;player.vy=0;player.dir=1;player.onGround=false;player.jumps=0;
@@ -218,6 +244,7 @@
 
   playBtn.addEventListener('click',()=>{
     if(gameStarted)return;
+    registerPlay();
     gameStarted=true;
     splash.classList.add('hidden');
     startTime=performance.now();
@@ -273,17 +300,19 @@
     x.scale(viewScale,viewScale);
     const VW=W/viewScale, VH=H/viewScale;
 
-    // Warm, cinematic sky like the splash screen.
+    // Cinematic sky theme changes every 20 plays.
+    const bg=backgroundPalette();
     const sky=x.createLinearGradient(0,0,0,VH);
-    sky.addColorStop(0,'#5aa9ea');sky.addColorStop(.55,'#a9d9f4');sky.addColorStop(1,'#f7d3aa');
+    sky.addColorStop(0,bg.top);sky.addColorStop(.55,bg.mid);sky.addColorStop(1,bg.bottom);
     x.fillStyle=sky;x.fillRect(0,0,VW,VH);
 
-    // Sun glow, fixed in screen space so it reads as atmospheric lighting.
+    // Sun/moon glow.
     const sunX=VW*.82,sunY=Math.min(150,VH*.24);
     const glow=x.createRadialGradient(sunX,sunY,8,sunX,sunY,120);
-    glow.addColorStop(0,'rgba(255,244,186,.95)');glow.addColorStop(.22,'rgba(255,214,120,.55)');glow.addColorStop(1,'rgba(255,190,90,0)');
+    glow.addColorStop(0,backgroundLevel()===3?'rgba(235,240,255,.72)':'rgba(255,244,186,.95)');
+    glow.addColorStop(.22,bg.glow);glow.addColorStop(1,'rgba(255,190,90,0)');
     x.fillStyle=glow;x.beginPath();x.arc(sunX,sunY,120,0,Math.PI*2);x.fill();
-    x.fillStyle='#fff3c0';x.beginPath();x.arc(sunX,sunY,25,0,Math.PI*2);x.fill();
+    x.fillStyle=bg.sun;x.beginPath();x.arc(sunX,sunY,backgroundLevel()===3?18:25,0,Math.PI*2);x.fill();
 
     // Slow parallax clouds.
     const cloudOff=-cam.x*.07;
@@ -381,6 +410,15 @@
   function drawPlayer(){
     const sx=player.x-cam.x,sy=player.y;
     const run=Math.min(1,Math.abs(player.vx)/300);
+    const lvl=upgradeLevel();
+    const looks=[
+      {top:'#f04a38',mid:'#c92f28',dark:'#8f1e22',arm:'#cc342c',hood:'#a92327',pants:'#2b4770',shoe:'#f3f3f0',accent:'#ffffff'},
+      {top:'#29b6c8',mid:'#1686a0',dark:'#0d566d',arm:'#1686a0',hood:'#116f84',pants:'#243f62',shoe:'#ecfaff',accent:'#9ef3ff'},
+      {top:'#ffb52e',mid:'#e98316',dark:'#9e4d0b',arm:'#e98316',hood:'#ba5b10',pants:'#263a55',shoe:'#fff1b8',accent:'#ffe071'},
+      {top:'#8a69e8',mid:'#6047c2',dark:'#38277a',arm:'#6047c2',hood:'#4e36a0',pants:'#252e50',shoe:'#eef0ff',accent:'#8ff5ff'},
+      {top:'#252a34',mid:'#141821',dark:'#06080d',arm:'#171c25',hood:'#0d1017',pants:'#111827',shoe:'#ffd04a',accent:'#ffd04a'}
+    ];
+    const look=looks[lvl];
     const phase=performance.now()/95*run;
     const airborne=!player.onGround;
     const lean=Math.max(-.18,Math.min(.18,player.vx/1200));
@@ -400,11 +438,11 @@
     x.strokeStyle='#24364c';x.lineWidth=10;x.lineCap='round';x.beginPath();x.moveTo(-5,13);x.lineTo(-7-step*.35,34);x.stroke();
     x.strokeStyle='#20262d';x.lineWidth=7;x.beginPath();x.moveTo(-10-step*.35,38);x.lineTo(-20-step*.55,40);x.stroke();
     // Front leg.
-    x.strokeStyle='#2b4770';x.lineWidth=10;x.beginPath();x.moveTo(6,13);x.lineTo(8+step*.35,34);x.stroke();
-    x.strokeStyle='#f3f3f0';x.lineWidth=7;x.beginPath();x.moveTo(6+step*.35,39);x.lineTo(19+step*.55,39);x.stroke();
+    x.strokeStyle=look.pants;x.lineWidth=10;x.beginPath();x.moveTo(6,13);x.lineTo(8+step*.35,34);x.stroke();
+    x.strokeStyle=look.shoe;x.lineWidth=7;x.beginPath();x.moveTo(6+step*.35,39);x.lineTo(19+step*.55,39);x.stroke();
 
     // Hoodie torso with dimensional shading.
-    const hg=x.createLinearGradient(-18,-13,18,20);hg.addColorStop(0,'#f04a38');hg.addColorStop(.55,'#c92f28');hg.addColorStop(1,'#8f1e22');
+    const hg=x.createLinearGradient(-18,-13,18,20);hg.addColorStop(0,look.top);hg.addColorStop(.55,look.mid);hg.addColorStop(1,look.dark);
     x.fillStyle=hg;roundRect(x,-17,-12,34,34,10);x.fill();
     x.fillStyle='rgba(255,255,255,.20)';roundRect(x,-12,-8,7,23,4);x.fill();
     // Hoodie pocket.
@@ -412,12 +450,12 @@
 
     // Arms, animated slightly during movement.
     const armSwing=airborne?6:Math.sin(phase+Math.PI/2)*7;
-    x.strokeStyle='#cc342c';x.lineWidth=9;x.beginPath();x.moveTo(-13,-5);x.lineTo(-23,8+armSwing*.35);x.stroke();
+    x.strokeStyle=look.arm;x.lineWidth=9;x.beginPath();x.moveTo(-13,-5);x.lineTo(-23,8+armSwing*.35);x.stroke();
     x.beginPath();x.moveTo(13,-5);x.lineTo(25,5-armSwing*.35);x.stroke();
     x.fillStyle='#efb083';x.beginPath();x.arc(-25,10+armSwing*.35,4.5,0,Math.PI*2);x.arc(27,7-armSwing*.35,4.5,0,Math.PI*2);x.fill();
 
     // Hood behind head.
-    x.fillStyle='#a92327';x.beginPath();x.arc(0,-18,15,0,Math.PI*2);x.fill();
+    x.fillStyle=look.hood;x.beginPath();x.arc(0,-18,15,0,Math.PI*2);x.fill();
     // Face.
     const face=x.createRadialGradient(-4,-24,2,0,-20,15);face.addColorStop(0,'#ffd1a8');face.addColorStop(1,'#e49a6e');
     x.fillStyle=face;x.beginPath();x.ellipse(0,-22,12,14,0,0,Math.PI*2);x.fill();
@@ -427,6 +465,24 @@
     // Face details.
     x.fillStyle='#222a30';x.beginPath();x.arc(-4,-23,1.5,0,Math.PI*2);x.arc(4,-23,1.5,0,Math.PI*2);x.fill();
     x.strokeStyle='#9b523f';x.lineWidth=1.5;x.beginPath();x.arc(0,-18,4,0.15*Math.PI,.85*Math.PI);x.stroke();
+
+    // Upgrade details appear every 10 plays and stay unlocked on this browser.
+    if(lvl>=1){
+      x.fillStyle=look.accent;x.beginPath();x.arc(20,1,3.2,0,Math.PI*2);x.fill();
+    }
+    if(lvl>=2){
+      x.fillStyle='#2b3038';roundRect(x,-23,-8,7,25,4);x.fill();
+      x.strokeStyle=look.accent;x.lineWidth=2;x.beginPath();x.moveTo(-17,-7);x.lineTo(14,14);x.stroke();
+    }
+    if(lvl>=3){
+      x.fillStyle='rgba(120,240,255,.78)';roundRect(x,-9,-27,18,5,2.5);x.fill();
+      x.strokeStyle='rgba(255,255,255,.75)';x.lineWidth=1;x.stroke();
+    }
+    if(lvl>=4){
+      x.fillStyle='#f4c542';x.beginPath();x.moveTo(-15,-7);x.lineTo(-31,4);x.lineTo(-18,28);x.lineTo(-9,18);x.closePath();x.fill();
+      x.strokeStyle='#8a6208';x.lineWidth=1.5;x.stroke();
+      x.fillStyle='#f4c542';x.beginPath();x.arc(0,3,4.5,0,Math.PI*2);x.fill();
+    }
 
     x.restore();
   }
@@ -516,6 +572,7 @@
     const remain=Math.max(0,60-elapsed);
     if(gameStarted&&!finished&&remain<=0)finishRound('time');
     if(flyFlash>0)flyFlash=Math.max(0,flyFlash-dt);
+    if(upgradeFlash>0)upgradeFlash=Math.max(0,upgradeFlash-dt);
     document.getElementById('downBtn').style.display=flying?'block':'none';
     document.getElementById('jumpBtn').textContent=flying?'FLY UP':'JUMP';
     if(gameStarted)update(dt);
@@ -525,17 +582,23 @@
       const padL=Math.max(8,parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sat')||0));
       x.fillStyle='rgba(8,10,14,.72)';roundRect(x,W/2-165,6,330,34,12);x.fill();
       x.textAlign='center';x.font='bold 15px Arial';x.fillStyle=remain<=10?'#ff8a80':'#fff';
-      x.fillText(remain.toFixed(1)+'s   •   Coins '+collected+'/'+coins.length+'   •   Lives '+lives+'/3',W/2,28);x.textAlign='left';
+      x.fillText(remain.toFixed(1)+'s   •   Coins '+collected+'/'+coins.length+'   •   Lives '+lives+'/3   •   Lv '+(upgradeLevel()+1),W/2,28);x.textAlign='left';
     }else{
       x.fillStyle='rgba(8,10,14,.80)';roundRect(x,14,14,300,128,14);x.fill();
       x.fillStyle=remain<=10?'#ff8a80':'#fff';x.font='bold 30px Arial';x.fillText(remain.toFixed(1)+' s',28,49);
-      x.fillStyle='#fff';x.font='15px Arial';x.fillText('Coins: '+collected+' / '+coins.length,28,76);x.fillText('Score: '+score,28,99);x.fillText('Lives: '+lives+' / 3',28,122);
+      x.fillStyle='#fff';x.font='15px Arial';x.fillText('Coins: '+collected+' / '+coins.length,28,76);x.fillText('Score: '+score,28,99);x.fillText('Lives: '+lives+' / 3   •   '+upgradeName(),28,122);
       x.fillStyle='rgba(8,10,14,.55)';roundRect(x,W/2-185,18,370,34,14);x.fill();
       x.fillStyle='#fff';x.font='bold 15px Arial';x.textAlign='center';x.fillText('ROOFTOP COINS',W/2,40);x.textAlign='left';
     }
 
     if(flyFlash>0){x.fillStyle='rgba(0,0,0,.62)';roundRect(x,W/2-120,66,240,42,12);x.fill();x.fillStyle='#fff';x.font='bold 18px Arial';x.textAlign='center';x.fillText(flying?'FLY MODE ON!':'FLY MODE OFF',W/2,93);x.textAlign='left';}
-
+    if(upgradeFlash>0){
+      const bw=mobileMode?270:360,bh=66;
+      x.fillStyle='rgba(7,12,20,.88)';roundRect(x,W/2-bw/2,H*.18,bw,bh,16);x.fill();
+      x.strokeStyle='#ffd04a';x.lineWidth=2;x.stroke();
+      x.fillStyle='#ffd04a';x.textAlign='center';x.font=mobileMode?'bold 20px Arial':'bold 26px Arial';x.fillText('UPGRADE UNLOCKED!',W/2,H*.18+28);
+      x.fillStyle='#fff';x.font=mobileMode?'bold 14px Arial':'bold 17px Arial';x.fillText(upgradeName()+'  •  Level '+(upgradeLevel()+1),W/2,H*.18+51);x.textAlign='left';
+    }
 
     if(finished){
       x.fillStyle='rgba(0,0,0,.65)';x.fillRect(0,0,W,H);
