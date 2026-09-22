@@ -21,7 +21,10 @@
   #jumpBtn{width:68px;height:68px;border-radius:50%;font-size:14px}
   #downBtn{display:none}
   #codeBtn{position:absolute;left:8px;top:8px;z-index:12;display:none;border:1px solid rgba(255,255,255,.4);background:rgba(10,12,18,.45);color:#fff;border-radius:8px;padding:5px 7px;font:bold 9px Arial;letter-spacing:.08em;touch-action:manipulation}
-  body.mobile #touchControls,body.mobile #codeBtn{display:block}
+  #mobileActions{display:none;position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:13;gap:8px;pointer-events:auto}
+  .actionBtn{height:38px;min-width:74px;padding:0 12px;border-radius:12px;border:2px solid rgba(255,255,255,.78);background:rgba(10,12,18,.58);color:#fff;font:bold 11px Arial;letter-spacing:.04em;touch-action:manipulation;-webkit-tap-highlight-color:transparent;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+  .actionBtn:active{background:rgba(255,209,102,.92);color:#111}
+  body.mobile #touchControls,body.mobile #codeBtn,body.mobile #mobileActions{display:flex}
   body.mobile #help{display:none}
   #splash{position:absolute;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;background:#09111b;overflow:hidden;}
   #splash.hidden{display:none}
@@ -39,6 +42,7 @@
 <canvas id="game"></canvas>
 <div id="help"><b>MOVE</b>: A/D or ←/→ · <b>JUMP</b>: W / ↑ / Space · double-jump enabled<br><b>R</b>: restart 60-second round · <b>H</b>: end game early<br><b>LIVES</b>: 3 · falling off the bottom costs one life<br><b>GOAL</b>: reach the final rooftop or collect every coin before time runs out<br><span style="opacity:.65">On iPhone, use the touch controls. There may be a secret code...</span></div>
 <button id="codeBtn" type="button" aria-label="Enter secret code">CODE</button>
+<div id="mobileActions" aria-label="Game actions"><button id="restartBtn" class="actionBtn" type="button">↻ RESTART</button><button id="endBtn" class="actionBtn" type="button">END</button></div>
 <div id="touchControls" aria-label="Touch game controls">
   <div class="touchRow">
     <div class="touchSide left"><button id="leftBtn" class="touchBtn" type="button" aria-label="Move left">◀</button><button id="rightBtn" class="touchBtn" type="button" aria-label="Move right">▶</button></div>
@@ -126,6 +130,14 @@
     let v='';try{v=window.prompt('Enter secret code:','')||'';}catch(err){}
     if(v.trim()==='67'){flying=!flying;player.vy=0;flyFlash=1.5;clearTouch();}
   });
+  document.getElementById('restartBtn').addEventListener('pointerdown',e=>{
+    e.preventDefault();
+    if(gameStarted) reset();
+  },{passive:false});
+  document.getElementById('endBtn').addEventListener('pointerdown',e=>{
+    e.preventDefault();
+    if(gameStarted&&!finished) finishRound('early');
+  },{passive:false});
   c.addEventListener('contextmenu',e=>e.preventDefault());
   c.addEventListener('touchmove',e=>e.preventDefault(),{passive:false});
   addEventListener('blur',clearTouch);
@@ -153,15 +165,36 @@
     if(i%3===0) coinSeed.push({x:b.x-48,y:b.y-115});
   });
 
+  // ============================================================
+  // GAME SETTINGS - SAFE VALUES TO CHANGE
+  // ============================================================
+  // Character gets a new visual upgrade after this many plays.
+  const CHARACTER_UPGRADE_EVERY = 10;
+
+  // Background changes after this many plays.
+  const BACKGROUND_CHANGE_EVERY = 20;
+
+  // Length of each round, in seconds.
+  const ROUND_TIME_SECONDS = 60;
+
+  // Number of lives at the start of each round.
+  const STARTING_LIVES = 3;
+
+  // Points awarded for each coin.
+  const COIN_POINTS = 100;
+  // ============================================================
+  // END GAME SETTINGS - you normally do not need to edit below.
+  // ============================================================
+
   const player={x:80,y:400,w:34,h:54,vx:0,vy:0,dir:1,onGround:false,jumps:0};
-  let coins=[],score=0,collected=0,lives=3,startTime=0,last=0,finished=false,roundReady=false,flying=false,flyFlash=0;
+  let coins=[],score=0,collected=0,lives=STARTING_LIVES,startTime=0,last=0,finished=false,roundReady=false,flying=false,flyFlash=0;
   let finishReason='',finalElapsed=0,scoreSaved=false;
 
-  // Persistent character progression: one visual upgrade every 10 rounds played.
+  // Persistent character progression.
   const PLAY_COUNT_KEY='rooftopCoinJumpPlayCountV1';
   let playCount=0,upgradeFlash=0;
   try{playCount=Math.max(0,parseInt(localStorage.getItem(PLAY_COUNT_KEY)||'0',10)||0);}catch(err){}
-  function upgradeLevel(){return Math.min(4,Math.floor(playCount/10));}
+  function upgradeLevel(){return Math.min(4,Math.floor(playCount/CHARACTER_UPGRADE_EVERY));}
   function upgradeName(){return ['ROOKIE','STREET RUNNER','ROOFTOP PRO','SKY RACER','ROOFTOP LEGEND'][upgradeLevel()];}
   function registerPlay(){
     const before=upgradeLevel();
@@ -170,8 +203,8 @@
     if(upgradeLevel()>before) upgradeFlash=2.4;
   }
 
-  // The city atmosphere changes every 20 plays, using the same persistent play counter.
-  function backgroundLevel(){return Math.floor(playCount/20)%5;}
+  // The city atmosphere changes using the same persistent play counter.
+  function backgroundLevel(){return Math.floor(playCount/BACKGROUND_CHANGE_EVERY)%5;}
   function backgroundPalette(){
     return [
       {top:'#5aa9ea',mid:'#a9d9f4',bottom:'#f7d3aa',sun:'#fff3c0',glow:'rgba(255,214,120,.55)',far1:'#8197aa',far2:'#71899e'},
@@ -213,7 +246,7 @@
 
   function finishRound(reason){
     if(finished)return;
-    finalElapsed=Math.min(60,Math.max(0,(performance.now()-startTime)/1000));
+    finalElapsed=Math.min(ROUND_TIME_SECONDS,Math.max(0,(performance.now()-startTime)/1000));
     finishReason=reason;
     finished=true;
     addHighScore();
@@ -225,7 +258,7 @@
     if(rect.width>0&&rect.height>0){W=Math.round(rect.width);H=Math.round(rect.height);}
     player.x=80;player.y=Math.min(390,H/viewScale-150);player.vx=0;player.vy=0;player.dir=1;player.onGround=false;player.jumps=0;
     coins=coinSeed.map(q=>({...q,taken:false}));
-    score=0;collected=0;lives=3;startTime=now;finished=false;finishReason='';finalElapsed=0;scoreSaved=false;flying=false;flyFlash=0;cam.x=0;secret='';
+    score=0;collected=0;lives=STARTING_LIVES;startTime=now;finished=false;finishReason='';finalElapsed=0;scoreSaved=false;flying=false;flyFlash=0;cam.x=0;secret='';
     clearInput();clearTouch();
     gameStarted=true;
     splash.classList.add('hidden');
@@ -237,7 +270,7 @@
     if(rect.width>0&&rect.height>0){W=Math.round(rect.width);H=Math.round(rect.height);}
     player.x=80;player.y=Math.min(390,H/viewScale-150);player.vx=0;player.vy=0;player.dir=1;player.onGround=false;player.jumps=0;
     coins=coinSeed.map(q=>({...q,taken:false}));
-    score=0;collected=0;lives=3;startTime=now;finished=false;finishReason='';finalElapsed=0;scoreSaved=false;flying=false;flyFlash=0;cam.x=0;secret='';
+    score=0;collected=0;lives=STARTING_LIVES;startTime=now;finished=false;finishReason='';finalElapsed=0;scoreSaved=false;flying=false;flyFlash=0;cam.x=0;secret='';
     clearInput();clearTouch();
     roundReady=true;
   }
@@ -528,7 +561,7 @@
       if(q.taken)continue;
       const dx=(player.x+player.w/2)-q.x,dy=(player.y+player.h/2)-q.y;
       if(dx*dx+dy*dy<31*31){
-        q.taken=true;collected++;score+=100;
+        q.taken=true;collected++;score+=COIN_POINTS;
         if(collected===coins.length){finishRound('coins');return;}
       }
     }
@@ -569,7 +602,7 @@
     if(!roundReady){prepareOpeningScene(now);last=now;}
     const dt=last?Math.min(.033,Math.max(0,(now-last)/1000)):0;last=now;
     const elapsed=!gameStarted?0:(finished?finalElapsed:(now-startTime)/1000);
-    const remain=Math.max(0,60-elapsed);
+    const remain=Math.max(0,ROUND_TIME_SECONDS-elapsed);
     if(gameStarted&&!finished&&remain<=0)finishRound('time');
     if(flyFlash>0)flyFlash=Math.max(0,flyFlash-dt);
     if(upgradeFlash>0)upgradeFlash=Math.max(0,upgradeFlash-dt);
@@ -586,7 +619,7 @@
     }else{
       x.fillStyle='rgba(8,10,14,.80)';roundRect(x,14,14,300,128,14);x.fill();
       x.fillStyle=remain<=10?'#ff8a80':'#fff';x.font='bold 30px Arial';x.fillText(remain.toFixed(1)+' s',28,49);
-      x.fillStyle='#fff';x.font='15px Arial';x.fillText('Coins: '+collected+' / '+coins.length,28,76);x.fillText('Score: '+score,28,99);x.fillText('Lives: '+lives+' / 3   •   '+upgradeName(),28,122);
+      x.fillStyle='#fff';x.font='15px Arial';x.fillText('Coins: '+collected+' / '+coins.length,28,76);x.fillText('Score: '+score,28,99);x.fillText('Lives: '+lives+' / '+STARTING_LIVES+'   •   '+upgradeName(),28,122);
       x.fillStyle='rgba(8,10,14,.55)';roundRect(x,W/2-185,18,370,34,14);x.fill();
       x.fillStyle='#fff';x.font='bold 15px Arial';x.textAlign='center';x.fillText('ROOFTOP COINS',W/2,40);x.textAlign='left';
     }
