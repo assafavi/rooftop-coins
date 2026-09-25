@@ -42,10 +42,10 @@
 </head>
 <body>
 <div id="stage">
-<canvas id="game"></canvas>
-<div id="help"><b>MOVE</b>: A/D or ←/→ · <b>JUMP</b>: W / ↑ / Space · double-jump enabled<br><b>R</b>: restart 60-second round · <b>H</b>: end game early<br><b>LIVES</b>: 3 · falling off the bottom costs one life<br><b>GOAL</b>: keep moving right through as many levels as possible before losing all 3 lives<br><span style="opacity:.65">On iPhone: hold R = restart · hold E = end early · use the touch controls. There may be a secret code...</span></div>
+<canvas id="game" tabindex="-1"></canvas>
+<div id="help"><b>MOVE</b>: A/D or ←/→ · <b>JUMP</b>: W / ↑ / Space · double-jump enabled<br><b>P</b>: pause/resume · <b>R</b>: restart · <b>H</b>: end game early<br><b>LIVES</b>: falls, mines, or time can cost a life · medical kits can add lives · Shield blocks one mine hit<br><b>GOAL</b>: keep moving right through as many levels as possible; unlocked outfits/backgrounds progress again each run<br><span style="opacity:.65">On iPhone: tap P = pause/resume · hold R = restart · hold E = end early · use the touch controls. Some elevated bonuses unlock special routes. There may also be a secret code...</span></div>
 <button id="codeBtn" type="button" aria-label="Enter secret code">CODE</button>
-<div id="mobileActions" aria-label="Game actions"><button id="restartBtn" class="actionBtn" type="button" aria-label="Restart">R</button><button id="endBtn" class="actionBtn" type="button" aria-label="End game early">E</button></div>
+<div id="mobileActions" aria-label="Game actions"><button id="restartBtn" class="actionBtn" type="button" aria-label="Restart">R</button><button id="pauseBtn" class="actionBtn" type="button" aria-label="Pause or resume game">P</button><button id="endBtn" class="actionBtn" type="button" aria-label="End game early">E</button></div>
 <div id="touchControls" aria-label="Touch game controls">
   <div class="touchRow">
     <div class="touchSide left"><button id="leftBtn" class="touchBtn" type="button" aria-label="Move left">◀</button><button id="rightBtn" class="touchBtn" type="button" aria-label="Move right">▶</button></div>
@@ -100,11 +100,12 @@
     const k=e.key.toLowerCase();
     keys[k]=true;
     if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();
+    if(k==='p'&&gameStarted&&!finished){togglePause();e.preventDefault();return;}
     if(k==='r'&&gameStarted)reset();
     if(k==='h'&&gameStarted&&!finished)finishRound('early');
     if(/^[0-9]$/.test(e.key)){
       secret=(secret+e.key).slice(-2);
-      if(secret==='67'){flying=!flying;player.vy=0;flyFlash=1.5;secret='';}
+      if(secret==='67'){flightBonusActive=false;flyTimer=0;flying=!flying;player.vy=0;flyFlash=1.5;secret='';}
     }
   });
   addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
@@ -131,7 +132,7 @@
   jumpBtn.addEventListener('pointerup',releaseJump,{passive:false});jumpBtn.addEventListener('pointercancel',releaseJump,{passive:false});jumpBtn.addEventListener('pointerleave',releaseJump,{passive:false});
   document.getElementById('codeBtn').addEventListener('click',()=>{
     let v='';try{v=window.prompt('Enter secret code:','')||'';}catch(err){}
-    if(v.trim()==='67'){flying=!flying;player.vy=0;flyFlash=1.5;clearTouch();}
+    if(v.trim()==='67'){flightBonusActive=false;flyTimer=0;flying=!flying;player.vy=0;flyFlash=1.5;clearTouch();}
   });
   function bindHoldAction(id, action){
     const b=document.getElementById(id);
@@ -185,6 +186,15 @@
     const amp=Math.min(58,(level-2)*4);
     return Math.round(Math.sin(level*1.73+i*2.11)*amp);
   }
+
+  // V4 bonus-life / force-field settings must be defined before levels are generated.
+  const MAX_LIVES = 5;
+  const BONUS_LIFE_EVERY_LEVELS = 3;
+  const FORCE_FIELD_SECONDS = 7;
+  const FLY_BONUS_SECONDS = 9;
+  const FORCE_EVENT_EVERY_LEVELS = 4;
+  const FLY_EVENT_FIRST_LEVEL = 6;
+  const FLY_EVENT_EVERY_LEVELS = 6;
   for(let level=1;level<=MAX_LEVELS;level++){
     const off=(level-1)*LEVEL_WIDTH;
     const startIndex=buildings.length;
@@ -215,6 +225,30 @@
       const pb=buildings[startIndex+5];
       powerupSeed.push({x:pb.x+pb.w*.50,y:pb.y-72,type:['MAGNET','BOOST','SHIELD'][(level-2)%3],level});
     }
+    // Every third level offers a bonus-life medical kit, placed high enough to require a jump.
+    if(level%BONUS_LIFE_EVERY_LEVELS===0){
+      const lb=buildings[startIndex+Math.min(7,baseBuildings.length-2)];
+      powerupSeed.push({x:lb.x+lb.w*.58,y:lb.y-118,type:'LIFE',level});
+    }
+    // Force-field event: double-jump pickup followed immediately by a concentrated mine field.
+    if(level>=4&&level%FORCE_EVENT_EVERY_LEVELS===0){
+      const fb=buildings[startIndex+5];
+      powerupSeed.push({x:fb.x+fb.w*.52,y:fb.y-150,type:'FORCE',level});
+      const mineRoofs=[6,7,8];
+      mineRoofs.forEach((bi,j)=>{
+        const mb=buildings[startIndex+bi];
+        hazards.push({type:'mine',baseX:mb.x+mb.w*(j%2?.62:.30),baseY:mb.y-18,x:mb.x+mb.w*(j%2?.62:.30),y:mb.y-18,w:30,h:16,level,moving:j>0,vertical:j===2,range:j===1?70:58,speed:1.8+j*.35,phase:level+j*2.2,eventMine:true});
+      });
+      const floatB=buildings[startIndex+9];
+      hazards.push({type:'mine',baseX:floatB.x+floatB.w*.48,baseY:floatB.y-105,x:floatB.x+floatB.w*.48,y:floatB.y-105,w:30,h:16,level,moving:true,vertical:true,range:72,speed:2.25,phase:level*.7,eventMine:true});
+    }
+    // Flight event: elevated pickup, then two rooftops disappear to create a gap too wide to jump.
+    if(level>=FLY_EVENT_FIRST_LEVEL&&(level-FLY_EVENT_FIRST_LEVEL)%FLY_EVENT_EVERY_LEVELS===0){
+      const flyB=buildings[startIndex+6];
+      powerupSeed.push({x:flyB.x+flyB.w*.52,y:flyB.y-150,type:'FLY',level});
+      buildings[startIndex+8].flightGap=true;
+      buildings[startIndex+9].flightGap=true;
+    }
   }
   const finalBuilding=buildings[buildings.length-1];
   const FINISH_X=levelFinishes[levelFinishes.length-1].x;
@@ -239,6 +273,10 @@
   // Number of lives at the start of each round.
   const STARTING_LIVES = 3;
 
+  // Bonus medical kits can increase lives up to MAX_LIVES.
+  // A medical kit appears every BONUS_LIFE_EVERY_LEVELS levels.
+  // Force-field duration is controlled by FORCE_FIELD_SECONDS.
+
   // Points awarded for each coin.
   const COIN_POINTS = 100;
 
@@ -257,7 +295,7 @@
   // ============================================================
 
   const player={x:80,y:400,w:34,h:54,vx:0,vy:0,dir:1,onGround:false,jumps:0};
-  let coins=[],score=0,collected=0,lives=STARTING_LIVES,startTime=0,last=0,finished=false,roundReady=false,flying=false,flyFlash=0;
+  let coins=[],score=0,collected=0,lives=STARTING_LIVES,startTime=0,last=0,finished=false,roundReady=false,flying=false,flyFlash=0,paused=false;
   let finishReason='',finalElapsed=0,scoreSaved=false;
   // V4 run state.
   let currentLevel=1,gameTimeRemaining=ROUND_TIME_SECONDS,levelStartTimeRemaining=ROUND_TIME_SECONDS,totalRunElapsed=0;
@@ -267,7 +305,7 @@
 
   // 3.0 effects, combos, landing bonuses, power-ups and lightweight generated audio.
   let combo=0,comboTimer=0,comboFlash=0,bonusText='',bonusFlash=0,wasGrounded=false,jumpStartX=0;
-  let particles=[],powerups=[],magnetTimer=0,boostTimer=0,shieldTimer=0,lastCountdownBeep=-1;
+  let particles=[],powerups=[],magnetTimer=0,boostTimer=0,shieldTimer=0,forceFieldTimer=0,flyTimer=0,flightBonusActive=false,lastCountdownBeep=-1;
   let audioCtx=null;
   function unlockAudio(){try{if(!audioCtx)audioCtx=new (window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')audioCtx.resume();}catch(err){}}
   function tone(freq,dur=.08,type='sine',vol=.045,delay=0){
@@ -277,23 +315,46 @@
   addEventListener('pointerdown',unlockAudio,{once:true});addEventListener('keydown',unlockAudio,{once:true});
   function burst(px,py,count=10,kind='coin'){for(let i=0;i<count;i++){const a=Math.random()*Math.PI*2,sp=50+Math.random()*150;particles.push({x:px,y:py,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-35,life:.35+Math.random()*.45,max:.8,kind});}}
   function showBonus(text,pts=0){bonusText=text+(pts?' +'+pts:'');bonusFlash=1.25;}
-  function resetExtras(){combo=0;comboTimer=0;comboFlash=0;bonusText='';bonusFlash=0;particles=[];magnetTimer=boostTimer=shieldTimer=0;lastCountdownBeep=-1;wasGrounded=false;jumpStartX=player.x;powerups=powerupSeed.map(p=>({...p,taken:false}));}
+  function togglePause(){
+    if(!gameStarted||finished)return;
+    paused=!paused;clearInput();clearTouch();last=performance.now();
+    const pb=document.getElementById('pauseBtn');if(pb)pb.textContent=paused?'▶':'P';
+    if(!paused)unlockAudio();
+  }
+  function resetExtras(){combo=0;comboTimer=0;comboFlash=0;bonusText='';bonusFlash=0;particles=[];magnetTimer=boostTimer=shieldTimer=forceFieldTimer=flyTimer=0;flightBonusActive=false;lastCountdownBeep=-1;wasGrounded=false;jumpStartX=player.x;powerups=powerupSeed.map(p=>({...p,taken:false}));}
 
-  // Persistent character progression.
+  // Permanent cosmetic unlocks + per-run visual progression.
+  // The browser remembers the highest outfit/background earned, but every new run
+  // starts with the basic look and steps back through the unlocked cosmetics.
   const PLAY_COUNT_KEY='rooftopCoinJumpPlayCountV1';
-  let playCount=0,upgradeFlash=0;
+  const COSMETIC_LEVELS_PER_STEP=2;
+  const OUTFIT_NAMES=['ROOKIE','STREET RUNNER','ROOFTOP PRO','SKY RACER','ROOFTOP LEGEND'];
+  let playCount=0,upgradeFlash=0,upgradeFlashLabel='';
   try{playCount=Math.max(0,parseInt(localStorage.getItem(PLAY_COUNT_KEY)||'0',10)||0);}catch(err){}
-  function upgradeLevel(){return Math.min(4,Math.floor(playCount/CHARACTER_UPGRADE_EVERY));}
-  function upgradeName(){return ['ROOKIE','STREET RUNNER','ROOFTOP PRO','SKY RACER','ROOFTOP LEGEND'][upgradeLevel()];}
+
+  function unlockedOutfitLevel(){return Math.min(4,Math.floor(playCount/CHARACTER_UPGRADE_EVERY));}
+  function unlockedBackgroundLevel(){return Math.min(4,Math.floor(playCount/BACKGROUND_CHANGE_EVERY));}
+  function runCosmeticLevel(){return Math.min(4,Math.floor(Math.max(0,currentLevel-1)/COSMETIC_LEVELS_PER_STEP));}
+  function upgradeLevel(){return Math.min(unlockedOutfitLevel(),runCosmeticLevel());}
+  function upgradeName(){return OUTFIT_NAMES[upgradeLevel()];}
+  function backgroundLevel(){return Math.min(unlockedBackgroundLevel(),runCosmeticLevel());}
+
   function registerPlay(){
-    const before=upgradeLevel();
+    const outfitBefore=unlockedOutfitLevel();
+    const bgBefore=unlockedBackgroundLevel();
     playCount++;
     try{localStorage.setItem(PLAY_COUNT_KEY,String(playCount));}catch(err){}
-    if(upgradeLevel()>before) upgradeFlash=2.4;
+    const outfitAfter=unlockedOutfitLevel();
+    const bgAfter=unlockedBackgroundLevel();
+    if(outfitAfter>outfitBefore){
+      upgradeFlash=2.8;
+      upgradeFlashLabel=OUTFIT_NAMES[outfitAfter]+' PERMANENTLY UNLOCKED';
+    }else if(bgAfter>bgBefore){
+      upgradeFlash=2.8;
+      upgradeFlashLabel='NEW CITY BACKGROUND UNLOCKED';
+    }
   }
 
-  // The city atmosphere changes using the same persistent play counter.
-  function backgroundLevel(){return Math.floor(playCount/BACKGROUND_CHANGE_EVERY)%5;}
   function backgroundPalette(){
     return [
       {top:'#5aa9ea',mid:'#a9d9f4',bottom:'#f7d3aa',sun:'#fff3c0',glow:'rgba(255,214,120,.55)',far1:'#8197aa',far2:'#71899e'},
@@ -347,13 +408,13 @@
     for(const q of coins)if(q.level===currentLevel)q.taken=false;
     for(const p of powerups)if(p.level===currentLevel)p.taken=false;
     player.x=levelStartX(currentLevel);player.y=80;player.vx=0;player.vy=0;player.dir=1;player.onGround=false;player.jumps=0;
-    cam.x=Math.max(0,(currentLevel-1)*LEVEL_WIDTH);combo=0;comboTimer=0;particles=[];magnetTimer=boostTimer=shieldTimer=0;hazardCooldown=1.0;lastCountdownBeep=-1;
+    cam.x=Math.max(0,(currentLevel-1)*LEVEL_WIDTH);combo=0;comboTimer=0;particles=[];magnetTimer=boostTimer=shieldTimer=forceFieldTimer=flyTimer=0;flightBonusActive=false;flying=false;hazardCooldown=1.0;lastCountdownBeep=-1;
     levelMessage='LEVEL '+currentLevel+' - TRY AGAIN';levelFlash=1.6;
   }
 
   function loseLife(reason){
     if(finished||hazardCooldown>0)return;
-    if(reason!=='time'&&shieldTimer>0){shieldTimer=0;showBonus('SHIELD SAVED YOU');sfx('power');hazardCooldown=.7;return;}
+    if(reason==='mine'&&shieldTimer>0){shieldTimer=0;showBonus('SHIELD BLOCKED THE HIT');sfx('power');hazardCooldown=.7;return;}
     lives--;
     if(reason==='mine'){burst(player.x+player.w/2,player.y+player.h/2,30,'blast');tone(95,.18,'sawtooth',.06);tone(55,.26,'square',.04,.04);}
     if(lives<=0){finishRound('lives');return;}
@@ -363,6 +424,7 @@
   function advanceLevel(){
     if(currentLevel>=MAX_LEVELS){finishRound('finish');return;}
     const completed=currentLevel;
+    const oldOutfit=upgradeLevel(),oldBackground=backgroundLevel();
     const bonus=levelBonus(completed+1);
     gameTimeRemaining+=bonus;
     currentLevel++;
@@ -370,6 +432,10 @@
     lastCountdownBeep=-1;hazardCooldown=.65;
     const intro=currentLevel===2?'OBSTACLES AHEAD':currentLevel===4?'MINES AHEAD':currentLevel===6?'MOVING OBSTACLES':currentLevel===7?'MOVING MINES':'KEEP GOING!';
     levelMessage='LEVEL '+currentLevel+'   +'+bonus+' SEC   '+intro;levelFlash=2.4;
+    const newOutfit=upgradeLevel(),newBackground=backgroundLevel();
+    if(newOutfit>oldOutfit&&newBackground>oldBackground) showBonus('NEW LOOK: '+upgradeName()+' + CITY');
+    else if(newOutfit>oldOutfit) showBonus('NEW LOOK: '+upgradeName());
+    else if(newBackground>oldBackground) showBonus('CITY LOOK UPGRADE');
     sfx('finish');
   }
 
@@ -379,7 +445,7 @@
     if(rect.width>0&&rect.height>0){W=Math.round(rect.width);H=Math.round(rect.height);}
     player.x=80;player.y=Math.min(390,H/viewScale-150);player.vx=0;player.vy=0;player.dir=1;player.onGround=false;player.jumps=0;
     coins=coinSeed.map(q=>({...q,taken:false}));
-    score=0;collected=0;lives=STARTING_LIVES;startTime=now;finished=false;finishReason='';finalElapsed=0;scoreSaved=false;flying=false;flyFlash=0;cam.x=0;secret='';currentLevel=1;gameTimeRemaining=ROUND_TIME_SECONDS;levelStartTimeRemaining=ROUND_TIME_SECONDS;totalRunElapsed=0;levelStartScore=0;levelStartCollected=0;levelFlash=0;levelMessage='';hazardCooldown=0;resetExtras();
+    score=0;collected=0;lives=STARTING_LIVES;startTime=now;finished=false;finishReason='';finalElapsed=0;scoreSaved=false;flying=false;flyFlash=0;cam.x=0;secret='';currentLevel=1;gameTimeRemaining=ROUND_TIME_SECONDS;levelStartTimeRemaining=ROUND_TIME_SECONDS;totalRunElapsed=0;levelStartScore=0;levelStartCollected=0;levelFlash=0;levelMessage='';hazardCooldown=0;paused=false;resetExtras();
     clearInput();clearTouch();
     gameStarted=true;
     splash.classList.add('hidden');
@@ -391,20 +457,45 @@
     if(rect.width>0&&rect.height>0){W=Math.round(rect.width);H=Math.round(rect.height);}
     player.x=80;player.y=Math.min(390,H/viewScale-150);player.vx=0;player.vy=0;player.dir=1;player.onGround=false;player.jumps=0;
     coins=coinSeed.map(q=>({...q,taken:false}));
-    score=0;collected=0;lives=STARTING_LIVES;startTime=now;finished=false;finishReason='';finalElapsed=0;scoreSaved=false;flying=false;flyFlash=0;cam.x=0;secret='';currentLevel=1;gameTimeRemaining=ROUND_TIME_SECONDS;levelStartTimeRemaining=ROUND_TIME_SECONDS;totalRunElapsed=0;levelStartScore=0;levelStartCollected=0;levelFlash=0;levelMessage='';hazardCooldown=0;resetExtras();
+    score=0;collected=0;lives=STARTING_LIVES;startTime=now;finished=false;finishReason='';finalElapsed=0;scoreSaved=false;flying=false;flyFlash=0;cam.x=0;secret='';currentLevel=1;gameTimeRemaining=ROUND_TIME_SECONDS;levelStartTimeRemaining=ROUND_TIME_SECONDS;totalRunElapsed=0;levelStartScore=0;levelStartCollected=0;levelFlash=0;levelMessage='';hazardCooldown=0;paused=false;resetExtras();
     clearInput();clearTouch();
     roundReady=true;
   }
 
-  playBtn.addEventListener('click',()=>{
+  function startGame(e){
+    if(e){e.preventDefault();e.stopPropagation();}
     if(gameStarted)return;
+    const now=performance.now();
     registerPlay();
     gameStarted=true;
+    finished=false;
+    paused=false;
+    roundReady=true;
     splash.classList.add('hidden');
-    startTime=performance.now();
-    last=startTime;resetExtras();levelMessage='LEVEL 1 - GO!';levelFlash=2.0;unlockAudio();tone(660,.08,'triangle',.03);tone(880,.10,'triangle',.03,.08);
-    clearInput();clearTouch();
+    splash.setAttribute('aria-hidden','true');
+    startTime=now;
+    last=now;
+    resetExtras();
+    levelMessage='LEVEL 1 - GO!';
+    levelFlash=2.0;
+    clearInput();
+    clearTouch();
+    unlockAudio();
+    tone(660,.08,'triangle',.03);
+    tone(880,.10,'triangle',.03,.08);
+    try{c.focus({preventScroll:true});}catch(err){}
+  }
+
+  // Robust splash start for desktop and iPhone/iPad Safari.
+  playBtn.addEventListener('click',startGame);
+  playBtn.addEventListener('pointerup',startGame,{passive:false});
+  playBtn.addEventListener('touchend',startGame,{passive:false});
+  playBtn.addEventListener('keydown',e=>{
+    if(e.key==='Enter'||e.key===' '||e.key==='Spacebar')startGame(e);
   });
+
+  const pauseBtn=document.getElementById('pauseBtn');
+  if(pauseBtn)pauseBtn.addEventListener('click',()=>togglePause());
 
   function roundRect(ctx,a,b,w,h,r){ctx.beginPath();ctx.roundRect(a,b,w,h,r);}
   function gradient(y1,y2,c1,c2){const g=x.createLinearGradient(0,y1,0,y2);g.addColorStop(0,c1);g.addColorStop(1,c2);return g;}
@@ -500,6 +591,7 @@
     const base=Math.max(VH+90,760);
     for(let i=0;i<buildings.length;i++){
       const b=buildings[i];
+      if(b.flightGap)continue;
       if(b.x+b.w<cam.x-120||b.x>cam.x+VW+120)continue;
       // Deep side extrusion and ground shadow.
       x.fillStyle='rgba(37,49,61,.55)';x.fillRect(b.x+22,b.y-14,b.w,base-b.y+20);
@@ -579,8 +671,32 @@
       x.restore();
     }
 
-    // Collectible power-ups.
-    for(const p of powerups){if(p.taken||p.x<cam.x-80||p.x>cam.x+VW+80)continue;const bob=Math.sin(t*3+p.x*.01)*5;x.save();x.translate(p.x,p.y+bob);x.shadowColor='rgba(255,255,255,.55)';x.shadowBlur=16;x.fillStyle=p.type==='MAGNET'?'#ef5350':p.type==='BOOST'?'#42a5f5':'#66bb6a';x.beginPath();x.arc(0,0,18,0,Math.PI*2);x.fill();x.shadowBlur=0;x.fillStyle='#fff';x.font='bold 11px Arial';x.textAlign='center';x.fillText(p.type==='MAGNET'?'M':p.type==='BOOST'?'B':'S',0,4);x.restore();}
+    // Collectible power-ups with recognizable object graphics instead of lettered circles.
+    for(const p of powerups){
+      if(p.taken||p.x<cam.x-90||p.x>cam.x+VW+90)continue;
+      const bob=Math.sin(t*3+p.x*.01)*5;
+      x.save();x.translate(p.x,p.y+bob);x.shadowColor='rgba(255,255,255,.55)';x.shadowBlur=15;
+      if(p.type==='MAGNET'){
+        x.lineWidth=8;x.lineCap='round';x.strokeStyle='#e53935';x.beginPath();x.arc(0,1,14,.12*Math.PI,.88*Math.PI,true);x.stroke();
+        x.shadowBlur=0;x.fillStyle='#eceff1';x.fillRect(-16,-10,8,9);x.fillRect(8,-10,8,9);x.fillStyle='#263238';x.fillRect(-16,-10,8,3);x.fillRect(8,-10,8,3);
+      }else if(p.type==='BOOST'){
+        const g=x.createLinearGradient(-16,-18,16,18);g.addColorStop(0,'#7dd8ff');g.addColorStop(1,'#1565c0');x.fillStyle=g;roundRect(x,-15,-20,30,40,9);x.fill();
+        x.shadowBlur=0;x.strokeStyle='#d8f5ff';x.lineWidth=2;x.stroke();x.fillStyle='#fff176';x.beginPath();x.moveTo(3,-13);x.lineTo(-7,3);x.lineTo(0,3);x.lineTo(-4,14);x.lineTo(10,-3);x.lineTo(3,-3);x.closePath();x.fill();
+      }else if(p.type==='SHIELD'){
+        const g=x.createLinearGradient(0,-20,0,20);g.addColorStop(0,'#9ccc65');g.addColorStop(1,'#2e7d32');x.fillStyle=g;x.beginPath();x.moveTo(0,-20);x.lineTo(16,-14);x.lineTo(13,5);x.quadraticCurveTo(9,15,0,21);x.quadraticCurveTo(-9,15,-13,5);x.lineTo(-16,-14);x.closePath();x.fill();
+        x.shadowBlur=0;x.strokeStyle='#e8f5e9';x.lineWidth=2;x.stroke();
+      }else if(p.type==='FORCE'){
+        x.fillStyle='rgba(79,195,247,.30)';x.beginPath();x.arc(0,0,22,0,Math.PI*2);x.fill();x.strokeStyle='#80deea';x.lineWidth=3;x.stroke();x.shadowBlur=0;
+        x.strokeStyle='#e0f7fa';x.lineWidth=2;x.beginPath();for(let i=0;i<6;i++){const a=-Math.PI/2+i*Math.PI/3,px=Math.cos(a)*13,py=Math.sin(a)*13;if(i===0)x.moveTo(px,py);else x.lineTo(px,py);}x.closePath();x.stroke();x.fillStyle='#b2ebf2';x.beginPath();x.arc(0,0,5,0,Math.PI*2);x.fill();
+      }else if(p.type==='FLY'){
+        x.fillStyle='#f4f7fb';roundRect(x,-19,-15,38,30,9);x.fill();x.shadowBlur=0;x.strokeStyle='#90caf9';x.lineWidth=2;x.stroke();
+        x.fillStyle='#1976d2';x.beginPath();x.moveTo(-2,-11);x.lineTo(7,-2);x.lineTo(18,0);x.lineTo(7,3);x.lineTo(-2,13);x.lineTo(1,3);x.lineTo(-14,7);x.lineTo(-18,3);x.lineTo(-5,0);x.lineTo(-18,-4);x.lineTo(-14,-8);x.lineTo(1,-3);x.closePath();x.fill();
+      }else if(p.type==='LIFE'){
+        x.fillStyle='#f7f7f2';roundRect(x,-20,-15,40,30,6);x.fill();x.shadowBlur=0;x.strokeStyle='#b0bec5';x.lineWidth=2;x.stroke();
+        x.fillStyle='#c62828';roundRect(x,-5,-11,10,22,2);x.fill();roundRect(x,-11,-5,22,10,2);x.fill();x.strokeStyle='#607d8b';x.lineWidth=3;x.beginPath();x.moveTo(-8,-16);x.lineTo(-8,-21);x.lineTo(8,-21);x.lineTo(8,-16);x.stroke();
+      }
+      x.restore();
+    }
 
     // Coin, landing and movement particles.
     for(const p of particles){x.globalAlpha=Math.max(0,p.life/p.max);x.fillStyle=p.kind==='coin'?'#ffd54f':p.kind==='land'?'#d7c6a4':p.kind==='blast'?'#ff6b35':'#9ee7ff';x.beginPath();x.arc(p.x,p.y,2.5+(p.life/p.max)*2,0,Math.PI*2);x.fill();}x.globalAlpha=1;
@@ -607,6 +723,13 @@
 
     // Soft contact shadow.
     x.fillStyle='rgba(20,25,30,.23)';x.beginPath();x.ellipse(0,player.h/2+7,26-airborne*5,7-airborne*2,0,0,Math.PI*2);x.fill();
+
+    if(forceFieldTimer>0){
+      const pulse=1+.045*Math.sin(performance.now()/85);x.save();x.scale(pulse,pulse);
+      const fg=x.createRadialGradient(-10,-12,8,0,0,42);fg.addColorStop(0,'rgba(224,247,250,.08)');fg.addColorStop(.72,'rgba(77,208,225,.13)');fg.addColorStop(1,'rgba(38,198,218,.24)');x.fillStyle=fg;
+      x.beginPath();x.ellipse(0,1,39,47,0,0,Math.PI*2);x.fill();x.strokeStyle='rgba(178,235,242,.90)';x.lineWidth=2.5;x.stroke();
+      x.strokeStyle='rgba(128,222,234,.42)';x.lineWidth=1;x.beginPath();x.arc(0,1,33,performance.now()/500,performance.now()/500+Math.PI*1.45);x.stroke();x.restore();
+    }
 
     if(flying){
       x.save();x.globalAlpha=.82;
@@ -697,6 +820,7 @@
 
     if(!flying){
       for(const b of buildings){
+        if(b.flightGap)continue;
         const horizontal=player.x+player.w>b.x&&player.x<b.x+b.w;
         const oldBottom=oldY+player.h,newBottom=player.y+player.h;
         if(horizontal&&player.vy>=0&&oldBottom<=b.y+10&&newBottom>=b.y){
@@ -718,7 +842,17 @@
 
     // Magnet gently pulls nearby coins; collect power-ups by touching them.
     if(magnetTimer>0){for(const q of coins){if(q.taken)continue;const dx=(player.x+player.w/2)-q.x,dy=(player.y+player.h/2)-q.y,d=Math.hypot(dx,dy);if(d<190&&d>1){q.x+=dx*dt*3.4;q.y+=dy*dt*3.4;}}}
-    for(const p of powerups){if(p.taken)continue;const dx=(player.x+player.w/2)-p.x,dy=(player.y+player.h/2)-p.y;if(dx*dx+dy*dy<42*42){p.taken=true;if(p.type==='MAGNET')magnetTimer=POWERUP_SECONDS;if(p.type==='BOOST')boostTimer=POWERUP_SECONDS;if(p.type==='SHIELD')shieldTimer=POWERUP_SECONDS;score+=200;showBonus(p.type+' POWER-UP',200);burst(p.x,p.y,18,'air');sfx('power');}}
+    for(const p of powerups){
+      if(p.taken)continue;const dx=(player.x+player.w/2)-p.x,dy=(player.y+player.h/2)-p.y;
+      if(dx*dx+dy*dy<42*42){
+        p.taken=true;if(p.type==='MAGNET')magnetTimer=POWERUP_SECONDS;if(p.type==='BOOST')boostTimer=POWERUP_SECONDS;if(p.type==='SHIELD')shieldTimer=1;if(p.type==='FORCE')forceFieldTimer=FORCE_FIELD_SECONDS;if(p.type==='FLY'){flyTimer=FLY_BONUS_SECONDS;flightBonusActive=true;flying=true;player.vy=0;flyFlash=1.2;}
+        if(p.type==='LIFE'){
+          const before=lives;lives=Math.min(MAX_LIVES,lives+1);
+          if(lives>before){showBonus('BONUS LIFE!');tone(660,.08,'triangle',.04);tone(880,.10,'triangle',.04,.07);tone(1100,.14,'triangle',.035,.14);}else{score+=300;showBonus('MEDICAL KIT',300);sfx('power');}
+        }else{score+=200;showBonus(p.type==='FORCE'?'FORCE FIELD':p.type==='FLY'?'FLIGHT POWER':p.type==='SHIELD'?'SHIELD READY':p.type+' POWER-UP',200);sfx('power');}
+        burst(p.x,p.y,18,p.type==='LIFE'?'coin':'air');
+      }
+    }
 
     const gate=levelFinishes[currentLevel-1];
     if(gate&&player.x>=gate.x){advanceLevel();if(finished)return;}
@@ -728,16 +862,16 @@
     const nowSec=performance.now()/1000;
     for(const h of hazards){
       if(h.level!==currentLevel)continue;
-      h.x=h.moving?h.baseX+Math.sin(nowSec*h.speed+h.phase)*h.range:h.baseX;
+      if(h.moving){const wave=Math.sin(nowSec*h.speed+h.phase);if(h.vertical){h.x=h.baseX;h.y=h.baseY+wave*h.range;}else{h.x=h.baseX+wave*h.range;if(h.baseY!==undefined)h.y=h.baseY;}}else{h.x=h.baseX;if(h.baseY!==undefined)h.y=h.baseY;}
       const hit=player.x+player.w>h.x&&player.x<h.x+h.w&&player.y+player.h>h.y&&player.y<h.y+h.h;
       if(!hit)continue;
-      if(h.type==='mine'){loseLife('mine');return;}
+      if(h.type==='mine'){if(forceFieldTimer>0){showBonus('FORCE FIELD BLOCKED MINE');burst(h.x+h.w/2,h.y+h.h/2,22,'air');tone(180,.07,'square',.035);hazardCooldown=.35;continue;}loseLife('mine');return;}
       // Solid rooftop obstacle: stop forward momentum and push the player outside it.
       if(player.vx>0){player.x=h.x-player.w-1;player.vx=-75;}else if(player.vx<0){player.x=h.x+h.w+1;player.vx=75;}
     }
 
     // Timers and particle physics.
-    comboTimer=Math.max(0,comboTimer-dt);if(comboTimer===0)combo=0;comboFlash=Math.max(0,comboFlash-dt);bonusFlash=Math.max(0,bonusFlash-dt);magnetTimer=Math.max(0,magnetTimer-dt);boostTimer=Math.max(0,boostTimer-dt);shieldTimer=Math.max(0,shieldTimer-dt);
+    comboTimer=Math.max(0,comboTimer-dt);if(comboTimer===0)combo=0;comboFlash=Math.max(0,comboFlash-dt);bonusFlash=Math.max(0,bonusFlash-dt);magnetTimer=Math.max(0,magnetTimer-dt);boostTimer=Math.max(0,boostTimer-dt);forceFieldTimer=Math.max(0,forceFieldTimer-dt);if(flightBonusActive){flyTimer=Math.max(0,flyTimer-dt);if(flyTimer===0){flightBonusActive=false;flying=false;player.vy=0;showBonus('FLIGHT POWER ENDED');}}
     for(const p of particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=260*dt;p.life-=dt;}particles=particles.filter(p=>p.life>0);
     wasGrounded=player.onGround;
 
@@ -770,34 +904,34 @@
   function frame(now){
     if(!roundReady){prepareOpeningScene(now);last=now;}
     const dt=last?Math.min(.033,Math.max(0,(now-last)/1000)):0;last=now;
-    if(gameStarted&&!finished){gameTimeRemaining=Math.max(0,gameTimeRemaining-dt);totalRunElapsed+=dt;if(gameTimeRemaining<=0)loseLife('time');}
+    if(gameStarted&&!finished&&!paused){gameTimeRemaining=Math.max(0,gameTimeRemaining-dt);totalRunElapsed+=dt;if(gameTimeRemaining<=0)loseLife('time');}
     const remain=Math.max(0,gameTimeRemaining);
-    if(gameStarted&&!finished&&remain<=FINAL_COUNTDOWN_SECONDS){const sec=Math.ceil(remain);if(sec!==lastCountdownBeep){lastCountdownBeep=sec;sfx(sec<=3?'go':'beep');}}
+    if(gameStarted&&!finished&&!paused&&remain<=FINAL_COUNTDOWN_SECONDS){const sec=Math.ceil(remain);if(sec!==lastCountdownBeep){lastCountdownBeep=sec;sfx(sec<=3?'go':'beep');}}
     if(flyFlash>0)flyFlash=Math.max(0,flyFlash-dt);
     if(upgradeFlash>0)upgradeFlash=Math.max(0,upgradeFlash-dt);
     document.getElementById('downBtn').style.display=flying?'block':'none';
     document.getElementById('jumpBtn').textContent=flying?'FLY UP':'JUMP';
-    if(gameStarted)update(dt);
+    if(gameStarted&&!paused)update(dt);
     drawWorld();drawPlayer();
 
     if(mobileMode){
       const padL=Math.max(8,parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sat')||0));
       x.fillStyle='rgba(8,10,14,.72)';roundRect(x,W/2-165,6,330,34,12);x.fill();
       x.textAlign='center';x.font='bold 15px Arial';x.fillStyle=remain<=10?'#ff8a80':'#fff';
-      x.fillText(remain.toFixed(1)+'s   •   Level '+currentLevel+'   •   Coins '+collected+'   •   Lives '+lives+'/3',W/2,28);x.textAlign='left';
+      x.fillText(remain.toFixed(1)+'s   •   Level '+currentLevel+'   •   Coins '+collected+'   •   Lives '+lives,W/2,28);x.textAlign='left';
     }else{
       x.fillStyle='rgba(8,10,14,.80)';roundRect(x,14,14,300,128,14);x.fill();
       x.fillStyle=remain<=10?'#ff8a80':'#fff';x.font='bold 30px Arial';x.fillText(remain.toFixed(1)+' s',28,49);
-      x.fillStyle='#fff';x.font='15px Arial';x.fillText('Level: '+currentLevel+'   •   Coins: '+collected,28,76);x.fillText('Score: '+score,28,99);x.fillText('Lives: '+lives+' / '+STARTING_LIVES+'   •   '+upgradeName(),28,122);
+      x.fillStyle='#fff';x.font='15px Arial';x.fillText('Level: '+currentLevel+'   •   Coins: '+collected,28,76);x.fillText('Score: '+score,28,99);x.fillText('Lives: '+lives+'   •   '+upgradeName(),28,122);
       x.fillStyle='rgba(8,10,14,.55)';roundRect(x,W/2-185,18,370,34,14);x.fill();
       x.fillStyle='#fff';x.font='bold 15px Arial';x.textAlign='center';x.fillText('SUPER ROOFTOP V4',W/2,40);x.textAlign='left';
     }
 
     // 3.0 bonus / combo / power-up overlays.
     if(combo>=2&&comboTimer>0){x.fillStyle='rgba(8,10,14,.68)';roundRect(x,W-150,18,132,38,12);x.fill();x.fillStyle='#ffd54f';x.font='bold 18px Arial';x.textAlign='center';x.fillText('COMBO x'+combo,W-84,43);x.textAlign='left';}
-    const active=[];if(magnetTimer>0)active.push('MAGNET '+magnetTimer.toFixed(1));if(boostTimer>0)active.push('BOOST '+boostTimer.toFixed(1));if(shieldTimer>0)active.push('SHIELD '+shieldTimer.toFixed(1));if(active.length){x.fillStyle='rgba(8,10,14,.68)';roundRect(x,W/2-150,58,300,31,11);x.fill();x.fillStyle='#fff';x.font='bold 13px Arial';x.textAlign='center';x.fillText(active.join('  •  '),W/2,79);x.textAlign='left';}
+    const active=[];if(magnetTimer>0)active.push('MAGNET '+magnetTimer.toFixed(1));if(boostTimer>0)active.push('BOOST '+boostTimer.toFixed(1));if(shieldTimer>0)active.push('SHIELD READY');if(forceFieldTimer>0)active.push('FIELD '+forceFieldTimer.toFixed(1));if(flightBonusActive)active.push('FLY '+flyTimer.toFixed(1));if(active.length){x.fillStyle='rgba(8,10,14,.68)';roundRect(x,W/2-150,58,300,31,11);x.fill();x.fillStyle='#fff';x.font='bold 13px Arial';x.textAlign='center';x.fillText(active.join('  •  '),W/2,79);x.textAlign='left';}
     if(bonusFlash>0){x.globalAlpha=Math.min(1,bonusFlash*2);x.fillStyle='#fff';x.font=mobileMode?'bold 18px Arial':'bold 24px Arial';x.textAlign='center';x.fillText(bonusText,W/2,H*.28);x.textAlign='left';x.globalAlpha=1;}
-    if(gameStarted&&!finished&&remain<=FINAL_COUNTDOWN_SECONDS){const pulse=1+.06*Math.sin(performance.now()/90);x.save();x.translate(W/2,H*.13);x.scale(pulse,pulse);x.fillStyle=remain<=3?'#ff5252':'#fff';x.font=mobileMode?'bold 34px Arial':'bold 46px Arial';x.textAlign='center';x.fillText(Math.ceil(remain),0,0);x.restore();x.textAlign='left';}
+    if(gameStarted&&!finished&&!paused&&remain<=FINAL_COUNTDOWN_SECONDS){const pulse=1+.06*Math.sin(performance.now()/90);x.save();x.translate(W/2,H*.13);x.scale(pulse,pulse);x.fillStyle=remain<=3?'#ff5252':'#fff';x.font=mobileMode?'bold 34px Arial':'bold 46px Arial';x.textAlign='center';x.fillText(Math.ceil(remain),0,0);x.restore();x.textAlign='left';}
 
     if(levelFlash>0){levelFlash=Math.max(0,levelFlash-dt);x.globalAlpha=Math.min(1,levelFlash*1.5);x.fillStyle='rgba(7,12,20,.88)';roundRect(x,W/2-(mobileMode?150:235),H*.20,mobileMode?300:470,58,15);x.fill();x.strokeStyle='#ffd54f';x.lineWidth=2;x.stroke();x.fillStyle='#fff';x.font=mobileMode?'bold 17px Arial':'bold 22px Arial';x.textAlign='center';x.fillText(levelMessage,W/2,H*.20+36);x.textAlign='left';x.globalAlpha=1;}
 
@@ -806,8 +940,13 @@
       const bw=mobileMode?270:360,bh=66;
       x.fillStyle='rgba(7,12,20,.88)';roundRect(x,W/2-bw/2,H*.18,bw,bh,16);x.fill();
       x.strokeStyle='#ffd04a';x.lineWidth=2;x.stroke();
-      x.fillStyle='#ffd04a';x.textAlign='center';x.font=mobileMode?'bold 20px Arial':'bold 26px Arial';x.fillText('UPGRADE UNLOCKED!',W/2,H*.18+28);
-      x.fillStyle='#fff';x.font=mobileMode?'bold 14px Arial':'bold 17px Arial';x.fillText(upgradeName()+'  •  Level '+(upgradeLevel()+1),W/2,H*.18+51);x.textAlign='left';
+      x.fillStyle='#ffd04a';x.textAlign='center';x.font=mobileMode?'bold 20px Arial':'bold 26px Arial';x.fillText('PERMANENT UPGRADE!',W/2,H*.18+28);
+      x.fillStyle='#fff';x.font=mobileMode?'bold 13px Arial':'bold 16px Arial';x.fillText(upgradeFlashLabel||upgradeName(),W/2,H*.18+51);x.textAlign='left';
+    }
+
+    if(paused&&!finished){
+      x.fillStyle='rgba(3,8,14,.62)';x.fillRect(0,0,W,H);x.fillStyle='#fff';x.textAlign='center';x.font=mobileMode?'bold 34px Arial':'bold 48px Arial';x.fillText('PAUSED',W/2,H/2-12);
+      x.font=mobileMode?'16px Arial':'19px Arial';x.fillText(mobileMode?'Tap P to resume':'Press P to resume',W/2,H/2+26);x.textAlign='left';
     }
 
     if(finished){
