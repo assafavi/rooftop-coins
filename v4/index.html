@@ -257,7 +257,7 @@
   // GAME SETTINGS - SAFE VALUES TO CHANGE
   // ============================================================
   // Character gets a new visual upgrade after this many plays.
-  const CHARACTER_UPGRADE_EVERY = 10;
+  const CHARACTER_UPGRADE_EVERY = 6;
 
   // Background changes after this many plays.
   const BACKGROUND_CHANGE_EVERY = 5;
@@ -289,7 +289,7 @@
   const FINAL_COUNTDOWN_SECONDS = 10;
 
   // How long the mobile R and E buttons must be held before they activate, in seconds.
-  const MOBILE_ACTION_HOLD_SECONDS = 0.7;
+  const MOBILE_ACTION_HOLD_SECONDS = 0.5;
   // ============================================================
   // END GAME SETTINGS - you normally do not need to edit below.
   // ============================================================
@@ -930,7 +930,7 @@
     // 3.0 bonus / combo / power-up overlays.
     if(combo>=2&&comboTimer>0){x.fillStyle='rgba(8,10,14,.68)';roundRect(x,W-150,18,132,38,12);x.fill();x.fillStyle='#ffd54f';x.font='bold 18px Arial';x.textAlign='center';x.fillText('COMBO x'+combo,W-84,43);x.textAlign='left';}
     const active=[];if(magnetTimer>0)active.push('MAGNET '+magnetTimer.toFixed(1));if(boostTimer>0)active.push('BOOST '+boostTimer.toFixed(1));if(shieldTimer>0)active.push('SHIELD READY');if(forceFieldTimer>0)active.push('FIELD '+forceFieldTimer.toFixed(1));if(flightBonusActive)active.push('FLY '+flyTimer.toFixed(1));if(active.length){x.fillStyle='rgba(8,10,14,.68)';roundRect(x,W/2-150,58,300,31,11);x.fill();x.fillStyle='#fff';x.font='bold 13px Arial';x.textAlign='center';x.fillText(active.join('  •  '),W/2,79);x.textAlign='left';}
-    if(bonusFlash>0){x.globalAlpha=Math.min(1,bonusFlash*2);x.fillStyle='#fff';x.font=mobileMode?'bold 18px Arial':'bold 24px Arial';x.textAlign='center';x.fillText(bonusText,W/2,H*.28);x.textAlign='left';x.globalAlpha=1;}
+    if(bonusFlash>0){x.globalAlpha=Math.min(1,bonusFlash*2);x.fillStyle='#fff';x.font=mobileMode?'bold 18px Arial':'bold 24px Arial';x.textAlign='center';x.fillText(bonusText,W/2,H*.38);x.textAlign='left';x.globalAlpha=1;}
     if(gameStarted&&!finished&&!paused&&remain<=FINAL_COUNTDOWN_SECONDS){const pulse=1+.06*Math.sin(performance.now()/90);x.save();x.translate(W/2,H*.13);x.scale(pulse,pulse);x.fillStyle=remain<=3?'#ff5252':'#fff';x.font=mobileMode?'bold 34px Arial':'bold 46px Arial';x.textAlign='center';x.fillText(Math.ceil(remain),0,0);x.restore();x.textAlign='left';}
 
     if(levelFlash>0){levelFlash=Math.max(0,levelFlash-dt);x.globalAlpha=Math.min(1,levelFlash*1.5);x.fillStyle='rgba(7,12,20,.88)';roundRect(x,W/2-(mobileMode?150:235),H*.20,mobileMode?300:470,58,15);x.fill();x.strokeStyle='#ffd54f';x.lineWidth=2;x.stroke();x.fillStyle='#fff';x.font=mobileMode?'bold 17px Arial':'bold 22px Arial';x.textAlign='center';x.fillText(levelMessage,W/2,H*.20+36);x.textAlign='left';x.globalAlpha=1;}
