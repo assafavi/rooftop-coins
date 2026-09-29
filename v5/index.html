@@ -52,8 +52,12 @@
   .actionBtn{width:46px;height:42px;min-width:46px;border-radius:12px;border:2px solid rgba(255,255,255,.85);background:linear-gradient(180deg,rgba(255,255,255,.34),rgba(255,255,255,.08)),rgba(28,26,32,.34);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);font:20px 'Lilita One','Arial Black',Arial,sans-serif;text-shadow:0 2px 2px rgba(0,0,0,.5)}
   #mobileActions{bottom:16px;gap:10px}
   #codeBtn{top:auto;bottom:calc(50% - 14px);left:8px;opacity:.55}
-  @media (max-height:430px){
-    .touchSide{bottom:8px}.touchBtn{width:62px;height:62px;font-size:24px}#jumpBtn{width:76px;height:76px;font-size:32px}.actionBtn{width:40px;height:36px;min-width:40px;font-size:17px}
+  /* V7.5 mobile landscape: keep primary movement controls as large as portrait */
+  @media (max-height:430px) and (orientation:landscape){
+    .touchSide{bottom:8px}
+    .touchBtn{width:78px;height:78px;font-size:30px}
+    #jumpBtn{width:96px;height:96px;font-size:40px}
+    .actionBtn{width:40px;height:36px;min-width:40px;font-size:17px}
   }
   @media (orientation:portrait){
     body.mobile #mobileActions{bottom:calc(var(--mobilePortraitActionsBottom) + env(safe-area-inset-bottom,0px));}
