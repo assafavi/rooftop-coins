@@ -1,257 +1,504 @@
 # Rooftop Coins
 
-**Rooftop Coins** is a browser-based rooftop platform game. Run, jump, double-jump, collect coins, avoid hazards, earn bonuses, and progress through increasingly difficult rooftop levels.
+**Rooftop Coins** is a browser-based rooftop platform game built around
+a simple loop:
 
-The project keeps **V2, V3, and V4** available as separate playable versions so newer development does not replace the earlier games.
+**Run → jump → collect → survive → advance**
 
-## Playable Versions
+The current development build is **Super Rooftop V7.5**. It keeps the
+original easy-to-learn controls while adding a more polished rooftop
+world, progressive levels, scoring bonuses, power-ups, hazards, cosmetic
+unlocks, desktop/mobile layouts, and persistent high scores.
 
-- **V2 — Classic:** the original Rooftop Coins game.
-- **V3 — Enhanced:** improved 2.5D graphics, animation, effects, scoring bonuses, power-ups, and sound effects.
-- **V4 — Super Rooftop:** level-based progression with hazards, bonus time, lives, advanced power-ups, cosmetic progression, and special challenge sections.
+## Current Version --- V7.5
 
-The root `index.html` is the version-selection screen and links to `v2/`, `v3/`, and `v4/`.
+V7.5 is the current main development version.
+
+Major V7/V7.5 improvements include:
+
+-   More detailed modular rooftop buildings and city artwork.
+-   Rooftop props including water towers, skylights, planters, vents,
+    ducts, pipes, antennas, railings, rooftop doors, and fire escapes.
+-   Improved background-city coverage so the lower screen remains filled
+    with buildings rather than exposed sky.
+-   Polished rendered coins, mines, medical kits, obstacles, and
+    power-up artwork.
+-   Camera easing, subtle forward look-ahead, and a small landing bump.
+-   Redesigned score HUD with **SCORE** and saved **BEST** score.
+-   Desktop-only keyboard legend.
+-   New Rooftop Coins splash/start screen.
+-   Improved portrait/mobile HUD layout.
+-   Raised mobile Restart / Pause / End controls.
+-   Removal of the old bottom-screen fog/fade so building artwork stays
+    visible to the bottom.
+-   Centralized **GAME SETTINGS - SAFE VALUES TO CHANGE** section.
+
+## Goal
+
+Run across the rooftops, collect coins, survive hazards, and advance
+through the levels before time runs out.
+
+The course becomes more difficult as the player progresses.
 
 ## Controls
 
 ### Desktop
-- **A / D** or **Left / Right Arrow** — Move
-- **W / Up Arrow / Space** — Jump
-- Press jump again while airborne — **Double jump**
-- **P** — Pause / resume
-- **R** — Restart
-- **H** — End the game early
-- Secret code **67** — Toggle the original secret fly mode
+
+-   **A / D** or **Left / Right Arrow** --- Move
+-   **W / Up Arrow / Space** --- Jump
+-   Press jump again while airborne --- **Double jump**
+-   **P** --- Pause / resume
+-   **H** --- Home / end the current run
+-   **R** --- Restart
+-   Secret code **67** --- Toggle the original secret fly mode
+
+A single-line shortcut legend is displayed near the bottom of the
+desktop game screen. The shortcut letters are highlighted in gold.
 
 ### iPhone / Mobile
-- On-screen left/right movement
-- Jump / double jump
-- **P** — Pause / resume
-- Hold **R** — Restart
-- Hold **E** — End early
-- While flying, the jump control becomes **FLY UP** and a down control appears.
 
-## Core V4 Gameplay
+-   Large on-screen **Left / Right** controls --- Move
+-   Large **Jump** button --- Jump / double jump
+-   **P** --- Pause / resume
+-   Hold **R** --- Restart
+-   Hold **E** --- End the current run
+-   **CODE** --- Enter the secret flight code
 
-V4 starts with **3 lives** and **60 seconds**. Coins are worth **100 points**. The player progresses through multiple rooftop levels with increasingly difficult hazards.
+Restart and End require a short hold to reduce accidental presses.
 
-Falling, running out of time, and certain hazards can cost a life. Medical kits can increase lives to a maximum of **5**.
+When temporary flight or secret flight is active, the jump control
+becomes **Fly Up** and the flight controls allow vertical movement.
 
-When a life is lost, the player retries the current V4 level rather than restarting the entire run.
+## Lives & Time
 
-## Level & Bonus-Time System
+Current default settings:
 
-Reaching the next level adds bonus time to whatever time remains.
+-   Starting lives: **3**
+-   Maximum lives: **6**
+-   Starting Level 1 time: **60 seconds**
+-   Final countdown begins with **10 seconds** remaining
+-   Medical kit: every **3 levels**
 
-Current timing settings:
-- Starting time: **60 seconds**
-- Base level bonus: **22 seconds**
-- Maximum level bonus: **38 seconds**
-- Final countdown warning: final **10 seconds**
+When the player advances to another level, bonus time is added to the
+remaining clock.
 
-The game displays the new level and added time when the player advances.
+Current level-time settings:
 
-## Medical-Kit Bonus Life
+-   Base level bonus: **22 seconds**
+-   Maximum level bonus: **38 seconds**
+-   Bonus increases every **2 levels**
+-   Increase per bonus step: **3 seconds**
 
-A medical kit appears every **3 levels**.
+## Levels
 
-It is shown as a white medical case with a red cross and is positioned high enough that the player must jump for it.
+The current game supports up to **30 levels** in a run.
 
-Collecting one adds **1 life**, up to the maximum of **5**. If the player already has the maximum number of lives, the kit awards bonus points instead.
+Each level uses the rooftop-building system with increasing variation
+and difficulty. Later levels introduce more demanding rooftop heights,
+moving obstacles, mines, moving mines, and special power-up challenge
+sections.
+
+Current hazard progression:
+
+-   Obstacles begin: **Level 2**
+-   Mines begin: **Level 4**
+-   Moving obstacles begin: **Level 6**
+-   Moving mines begin: **Level 7**
+
+## Scoring
+
+Current scoring values include:
+
+-   Coin: **100 points**
+-   Power-up pickup: **200 points**
+-   Perfect Jump: **250 points**
+-   Close Call: **150 points**
+-   Full-life medical kit: **300 points**
+-   Combo bonus step: **25 points**
+-   Combo window: **2 seconds**
+
+The upper-right HUD displays the current **SCORE** and saved **BEST**
+score.
 
 ## Power-Ups
 
-V4 uses graphical power-up objects rather than the earlier simple circles containing letters.
-
 ### Magnet
-A horseshoe-magnet-style pickup that temporarily pulls nearby coins toward the player.
+
+Temporarily attracts nearby coins toward the player.
+
+Current duration: **6 seconds**
 
 ### Boost
-An energy/lightning-style pickup that temporarily boosts movement.
+
+Temporarily improves the player's movement/jump capability.
+
+Current duration: **6 seconds**
 
 ### Shield
-A shield-shaped pickup providing **one-hit mine protection**.
 
-Once collected, `SHIELD READY` remains active until the player hits a mine. The Shield absorbs that hit and then disappears.
+Provides protection from **one mine hit**.
 
-**Shield = save it until you need it.**
+Once collected, the Shield remains ready until it absorbs a hit.
+
+**Shield = save protection until it is needed.**
 
 ### Force Field
-A glowing energy-orb pickup positioned high enough to encourage a **double jump**.
 
-When collected, an energy bubble surrounds the player for approximately **7 seconds**. Mines do not hurt the player while the Force Field is active.
+Creates temporary protection that allows the player to move safely
+through a mine-field challenge.
 
-Force Field sections are deliberately designed as events. Immediately after the pickup, the player encounters a concentrated mine field with rooftop and moving/floating mines.
+Current duration: **7 seconds**
 
-**Force Field = temporary protection; grab it and go through the dangerous section.**
+Force Field event levels intentionally use this sequence:
 
-### Flight Bonus
-An elevated flight pickup gives approximately **9 seconds of flight**, using the same basic flying mechanics as secret code `67`.
+**Collect Force Field → enter mine field → pass through while protected
+→ Shield appears afterward**
 
-Flight-event levels contain a large rooftop gap that ordinary jumping cannot cross. The player must grab the flight bonus and fly across before it expires.
+The regular rotating power-up is suppressed on these event levels so
+Shield and Force Field do not appear together before the mine field.
 
-The secret **67** code remains available separately as the original toggleable/testing fly mode.
+Force Field events currently occur every **4 levels**, beginning once
+mines are active.
 
-## Force Field Challenge
+### Flight
 
-The intended sequence is:
+Provides temporary flight.
 
-**Double-jump → collect Force Field → energy bubble activates → mine field appears → move through the danger before the field expires.**
+Current duration: **9 seconds**
 
-Mine-field sections can contain:
-- Stationary rooftop mines
-- Horizontally moving mines
-- Vertically moving/floating mines
-
-This makes the Force Field immediately useful instead of placing it where no danger is nearby.
-
-## Flight Challenge
+Flight-event levels intentionally create a rooftop gap that normal
+jumping cannot cross.
 
 The intended sequence is:
 
-**Jump for Flight bonus → flight activates → major rooftop gap appears → fly across before the timer expires.**
+**Jump for Flight → flight activates → cross the large gap → land before
+Flight expires**
 
-Some rooftops are deliberately omitted so normal jumping cannot cross the gap.
+The first Flight event begins at **Level 6** and repeats every **6
+levels**.
 
-## Pause System
+### Medical Kit / Extra Life
 
-V4 includes a true pause function:
-- Desktop: **P**
-- Mobile: tap **P**
+A medical kit appears every **3 levels**.
 
-While paused, player movement, the game timer, hazards, and power-up timers stop.
+Collecting it adds **1 life**, up to the maximum of **6**.
+
+If the player is already at maximum lives, the kit awards bonus points
+instead.
+
+## Special Gameplay Philosophy
+
+Rooftop Coins uses an **ability → challenge** design whenever possible.
+
+Examples:
+
+-   **Force Field → mine field**
+-   **Flight → otherwise impossible rooftop gap**
+-   **Shield → protection for a later hit**
+-   **Medical Kit → jump/risk for another life**
+
+This keeps power-ups connected to gameplay instead of making them purely
+decorative collectibles.
+
+## Camera & Presentation
+
+V7 introduced additional camera polish:
+
+-   Smooth horizontal camera easing.
+-   Subtle forward look-ahead based on player movement.
+-   Small landing bump on stronger landings.
+-   Player framing controlled by an adjustable screen-position setting.
+
+The building system also includes modular visual details such as rooftop
+access doors, railings, pipes, AC ducts, antennas, fire escapes, water
+towers, vents, skylights, planters, and other rooftop equipment.
+
+## Splash Screen
+
+V7.5 uses a new illustrated Rooftop Coins start screen designed to match
+the game's current visual style.
+
+The splash includes:
+
+-   Rooftop Coins title artwork.
+-   Rooftop/city scene.
+-   **START GAME** button.
+-   Desktop control guide.
+-   Power-up guide.
+
+The splash artwork itself does not need to carry the development version
+number.
+
+## Desktop HUD
+
+The desktop HUD includes:
+
+-   Lives
+-   Coin information
+-   Timer
+-   Current level
+-   Current score
+-   Best score
+-   Active power-up status
+-   Single-line keyboard shortcut legend near the bottom
+
+The former eagle and top pause icons were removed to simplify the HUD.
+
+## Mobile / Portrait Layout
+
+V7.5 includes dedicated portrait-mode layout adjustments.
+
+The mobile HUD is scaled and positioned separately so lives, coin
+information, timer, level, and score do not overlap.
+
+The mobile **R / P / E** action buttons are raised above the large
+movement controls.
+
+The old lower-screen fade/fog effect has been removed so
+rooftop/building artwork remains visible to the bottom of the screen.
 
 ## Cosmetic Progression
 
-Character outfits and city backgrounds use a **hybrid permanent-unlock / per-run progression system**.
+Character outfits and city backgrounds use persistent browser
+progression.
 
-The browser remembers the highest cosmetics permanently unlocked, but every new run starts visually simple again. As the player advances, the game progresses through cosmetics already unlocked:
+Current settings:
 
-- **Levels 1–2:** basic/Rookie look
-- **Levels 3–4:** next unlocked look
-- **Levels 5–6:** next
-- **Levels 7–8:** next
-- **Level 9+:** highest available unlocked look
+-   New character/outfit unlock: every **10 plays**
+-   New background unlock: every **5 plays**
+-   Cosmetic progression during a run: every **2 levels**
 
-Current outfit names:
-1. Rookie
-2. Street Runner
-3. Rooftop Pro
-4. Sky Racer
-5. Rooftop Legend
-
-If the player has not unlocked every tier, the run stops visually progressing at the highest tier owned.
-
-This fixes the earlier issue where, after all outfits/backgrounds had been earned, later games contained no visual progression.
+The game remembers unlocked cosmetics, while a new run can still
+progress visually through the unlocked tiers.
 
 ## Persistent Browser Data
 
-Rooftop Coins uses browser `localStorage` for information including:
-- Play count
-- Cosmetic unlock progression
-- High scores
+Rooftop Coins uses browser `localStorage` for information such as:
 
-Closing and reopening the game normally does not erase this information. Different browsers or devices can therefore have different progression.
+-   Play count
+-   Cosmetic unlock progression
+-   High scores
 
-## Major V3/V4 Improvements
+Closing and reopening the game normally preserves this information.
 
-Development beyond the original game includes 2.5D rooftops, parallax city backgrounds, animated character movement, improved coins, particles, rooftop details, dynamic camera behavior, perfect-jump and close-call bonuses, coin combos, power-ups, moving obstacles, mines, moving/floating mines, sound effects, dramatic final countdown, level progression, bonus time, cosmetic unlocks, per-run cosmetic progression, medical-kit bonus lives, one-hit Shield, timed Force Field, mine-field events, temporary flight, flight-required gaps, and pause/resume controls.
+Different browsers or devices can therefore have different scores and
+unlock progress.
 
-## On-Screen Bonus Displays
+## High Scores
 
-During play, active effects can display messages such as:
+The game stores up to **5 high scores**.
 
-`MAGNET` · `BOOST` · `SHIELD READY` · `FIELD 6.4` · `FLY 8.2`
+A qualifying score can prompt the player for a name of up to **10
+characters**.
 
-Temporary messages also appear for bonus lives, new cosmetics, level time, Shield hits, Force Fields, and flight events.
+The highest saved score is also shown as **BEST** in the in-game score
+HUD.
 
-The active-power-up bar is drawn near the bottom of the V4 JavaScript with code similar to:
+## GAME SETTINGS --- SAFE VALUES TO CHANGE
 
-```javascript
-roundRect(x,W/2-150,58,300,31,11);
-x.fillText(active.join('  •  '),W/2,79);
+The current HTML keeps the main creator-adjustable values together near
+the beginning of the JavaScript under:
+
+``` javascript
+// ============================================================
+// GAME SETTINGS - SAFE VALUES TO CHANGE
+// ============================================================
 ```
 
-Increasing `58` and `79` moves this display **lower** on the screen.
+This is the preferred place to tune the game rather than searching
+through the main gameplay code.
 
-Temporary bonus text uses:
+### World / Levels
 
-```javascript
-x.fillText(bonusText,W/2,H*.28);
+``` javascript
+LEVEL_WIDTH = 4300
+MAX_LEVELS = 30
+ROOFTOP_VARIATION_START_LEVEL = 3
+ROOFTOP_VARIATION_MAX = 58
+ROOFTOP_VARIATION_PER_LEVEL = 4
 ```
 
-Increasing `.28` (for example to `.38`) moves that message lower.
+### Cosmetics
 
-## Important V4 Settings
+``` javascript
+CHARACTER_UPGRADE_EVERY = 10
+BACKGROUND_CHANGE_EVERY = 5
+COSMETIC_LEVELS_PER_STEP = 2
+```
 
-Frequently adjusted values include:
+### Time
 
-```javascript
+``` javascript
 ROUND_TIME_SECONDS = 60
-STARTING_LIVES = 3
-MAX_LIVES = 5
-BONUS_LIFE_EVERY_LEVELS = 3
-
 LEVEL_BONUS_BASE_SECONDS = 22
 LEVEL_BONUS_MAX_SECONDS = 38
 LEVEL_BONUS_EVERY_LEVELS = 2
-
-FORCE_FIELD_SECONDS = 7
-FLY_BONUS_SECONDS = 9
-
-COIN_POINTS = 100
-COMBO_WINDOW_SECONDS = 2.0
-PERFECT_JUMP_POINTS = 250
-CLOSE_CALL_POINTS = 150
+LEVEL_BONUS_GROWTH_SECONDS = 3
 FINAL_COUNTDOWN_SECONDS = 10
 ```
 
-## GitHub Pages Structure
+### Lives & Power-Ups
 
-```text
+``` javascript
+STARTING_LIVES = 3
+MAX_LIVES = 6
+BONUS_LIFE_EVERY_LEVELS = 3
+POWERUP_SECONDS = 6
+FORCE_FIELD_SECONDS = 7
+FLY_BONUS_SECONDS = 9
+FORCE_EVENT_EVERY_LEVELS = 4
+FORCE_EVENT_POST_SHIELD = true
+FLY_EVENT_FIRST_LEVEL = 6
+FLY_EVENT_EVERY_LEVELS = 6
+MAGNET_RANGE = 190
+```
+
+### Hazards
+
+``` javascript
+OBSTACLE_START_LEVEL = 2
+MOVING_OBSTACLE_START_LEVEL = 6
+MINE_START_LEVEL = 4
+MOVING_MINE_START_LEVEL = 7
+```
+
+### Player Physics
+
+``` javascript
+RUN_SPEED = 300
+FLY_HORIZONTAL_SPEED = 340
+FLY_VERTICAL_SPEED = 310
+RUN_ACCELERATION = 1200
+JUMP_VELOCITY = -540
+BOOST_JUMP_VELOCITY = -610
+GRAVITY = 1450
+MAX_JUMPS = 2
+```
+
+### Score
+
+``` javascript
+COIN_POINTS = 100
+COMBO_WINDOW_SECONDS = 2.0
+COMBO_BONUS_STEP = 25
+PERFECT_JUMP_POINTS = 250
+CLOSE_CALL_POINTS = 150
+POWERUP_PICKUP_POINTS = 200
+FULL_LIFE_MEDKIT_POINTS = 300
+```
+
+### Message / HUD Position
+
+Screen-height values use fractions:
+
+-   `0.00` = top
+-   `0.50` = center
+-   `1.00` = bottom
+
+Current values include:
+
+``` javascript
+MESSAGE_BANNER_Y = 0.45
+LEVEL_BANNER_Y = 0.24
+FINAL_COUNTDOWN_Y = 0.20
+MESSAGE_BANNER_SECONDS = 1.25
+```
+
+Increasing `MESSAGE_BANNER_Y` moves the temporary bonus/power-up message
+**lower**.
+
+### Desktop Shortcut Legend
+
+``` javascript
+DESKTOP_LEGEND_Y = 0.955
+DESKTOP_LEGEND_FONT_SIZE = 15
+DESKTOP_LEGEND_OPACITY = 0.82
+DESKTOP_LEGEND_KEY_SIZE_BONUS = 2
+```
+
+### Mobile Portrait Layout
+
+``` javascript
+MOBILE_ACTION_HOLD_SECONDS = 0.7
+MOBILE_PORTRAIT_ACTIONS_BOTTOM = 118
+MOBILE_PORTRAIT_HUD_SCALE = 0.68
+MOBILE_PORTRAIT_HUD_TOP = 22
+MOBILE_PORTRAIT_TIMER_Y = 82
+```
+
+`MOBILE_PORTRAIT_ACTIONS_BOTTOM` controls how high the mobile **R / P /
+E** row sits above the bottom of the screen.
+
+### High Scores / Secret Code
+
+``` javascript
+HIGH_SCORE_COUNT = 5
+HIGH_SCORE_NAME_LENGTH = 10
+SECRET_FLY_CODE = '67'
+```
+
+## GitHub Pages
+
+Repository:
+
+`assafavi/rooftop-coins`
+
+Rooftop Coins is designed to run directly in the browser and can be
+hosted with GitHub Pages.
+
+The active development HTML can be used as the main `index.html` when
+publishing the current build.
+
+Older versions can remain in separate folders if they are still wanted
+for comparison or archival purposes.
+
+Example structure:
+
+``` text
 rooftop-coins/
 ├── index.html
 ├── README.md
+├── CHANGELOG.md
 ├── rooftop-coins-icon.png
 ├── v2/
 │   └── index.html
 ├── v3/
 │   └── index.html
-└── v4/
-    └── index.html
+├── v4/
+│   └── index.html
+└── archive/
+    └── older-builds...
 ```
-
-The root page lets players choose V2, V3, or V4 while keeping each version independent.
 
 ## iPhone Home-Screen Icon
 
-Store the custom icon in the repository root as `rooftop-coins-icon.png`.
+Store the custom icon in the repository as:
 
-The root HTML can reference it with:
+`rooftop-coins-icon.png`
 
-```html
-<link rel="apple-touch-icon" sizes="180x180" href="/rooftop-coins/rooftop-coins-icon.png">
-```
+The HTML currently includes an Apple touch-icon reference.
 
-iOS can cache Home Screen icons. If the artwork changes but the old icon remains, remove the existing Home Screen shortcut and add it again.
+If iOS continues showing an older icon after the artwork changes, remove
+the existing Home Screen shortcut and add it again because iOS may cache
+the previous icon.
 
-## Design Direction
+## Development Guidelines
 
-The basic Rooftop Coins formula remains:
+When adding features:
 
-**Run → jump → collect → survive → advance**
+1.  Keep the core controls simple.
+2.  Avoid adding controls unless they create meaningful gameplay.
+3.  Put creator-adjustable values in **GAME SETTINGS - SAFE VALUES TO
+    CHANGE**.
+4.  Keep desktop and mobile layouts independently usable.
+5.  Test both desktop landscape and iPhone portrait.
+6.  Prefer **ability → challenge** gameplay.
+7.  Preserve earlier working builds before major changes.
+8.  Update `README.md` and `CHANGELOG.md` when a meaningful version
+    milestone is reached.
 
-New mechanics should add replay value without making the controls complicated.
+------------------------------------------------------------------------
 
-V4 also follows this design principle:
+**Current development version documented here: Super Rooftop V7.5**
 
-**Give the player a special ability, then immediately present a challenge that makes that ability useful.**
-
-Examples:
-- **Force Field → mine field**
-- **Flight → otherwise impossible rooftop gap**
-- **Shield → protection saved for a future mine hit**
-
----
-
-**Current development version documented here: Super Rooftop V4.3 — Power Events**
+**README updated: September 28, 2026**
